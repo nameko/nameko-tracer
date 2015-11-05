@@ -1,0 +1,1 @@
+# Nameko Entrypoint Logger
