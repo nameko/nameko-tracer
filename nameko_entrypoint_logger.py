@@ -1,25 +1,26 @@
-from datetime import datetime
+import inspect
 import json
 import logging
 import socket
-import inspect
+
+from datetime import datetime
 from traceback import format_tb
 from weakref import WeakKeyDictionary
 
 from kombu import Connection
-from kombu.pools import producers, connections
-
+from kombu.pools import connections, producers
 from nameko.constants import (
-    DEFAULT_RETRY_POLICY, SERIALIZER_CONFIG_KEY,
-    DEFAULT_SERIALIZER)
+    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
+    SERIALIZER_CONFIG_KEY
+)
 
-from nameko.messaging import AMQP_URI_CONFIG_KEY
-from nameko.standalone.events import get_event_exchange
 from nameko.events import EventHandler
-from nameko.rpc import Rpc
-from nameko.web.handlers import HttpRequestHandler
 from nameko.extensions import DependencyProvider
+from nameko.messaging import AMQP_URI_CONFIG_KEY
+from nameko.rpc import Rpc
+from nameko.standalone.events import get_event_exchange
 from nameko.utils import get_redacted_args
+from nameko.web.handlers import HttpRequestHandler
 
 
 def default(obj):
@@ -33,14 +34,9 @@ def dumps(obj):
     return json.dumps(obj, default=default)
 
 
-def event_dispatcher(nameko_config, exchange_name, routing_key, **kwargs):
+def event_dispatcher(nameko_config, exchange_name, routing_key):
     """ Return a function that dispatches nameko events.
     """
-
-    kwargs = kwargs.copy()
-    retry = kwargs.pop('retry', True)
-    retry_policy = kwargs.pop('retry_policy', DEFAULT_RETRY_POLICY)
-
     def dispatch(event_data):
         """ Dispatch an event claiming to originate from `service_name` with
         the given `event_type` and `event_data`.
@@ -62,9 +58,9 @@ def event_dispatcher(nameko_config, exchange_name, routing_key, **kwargs):
                     declare=[exchange],
                     serializer=serializer,
                     routing_key=routing_key,
-                    retry=retry,
-                    retry_policy=retry_policy,
-                    **kwargs)
+                    retry=True,
+                    retry_policy=DEFAULT_RETRY_POLICY
+                )
     return dispatch
 
 
@@ -79,6 +75,7 @@ def parse_request(request):
 
 
 def get_worker_data(worker_ctx):
+
     provider = worker_ctx.entrypoint
     service_name = worker_ctx.service_name
     provider_name = provider.method_name
@@ -109,19 +106,16 @@ def get_worker_data(worker_ctx):
             'user_id': worker_ctx.data.get('user_id'),
             'user_agent': worker_ctx.data.get('user_agent'),
         },
-        'call_args': redacted_callargs,
+        'call_args': redacted_callargs
     }
 
 
 class BroadcastLogHandler(logging.Handler):
-    # Broadcast log messages to RabbitMQ queue
+    # Broadcast log messages to RabbitMq queue
     # TODO: Pre-queue in memory with eventlet.queue
     def __init__(
         self,
-        dispatcher,
-        force_tls=False,
-        verbose=True,
-        format=None
+        dispatcher
     ):
         self.dispatcher = dispatcher
         logging.Handler.__init__(self)
@@ -134,9 +128,11 @@ class BroadcastLogHandler(logging.Handler):
 
 
 class EntrypointLogger(DependencyProvider):
-    def __init__(self, exchange_name, routing_key):
+    def __init__(self, exchange_name, routing_key, propagate=False):
         self.exchange_name = exchange_name
         self.routing_key = routing_key
+        self.propagate = propagate
+        self.logger = None
 
     entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
 
@@ -144,8 +140,7 @@ class EntrypointLogger(DependencyProvider):
 
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
-        # TODO: When in public lib someone would want change to propagate?
-        logger.propagate = False
+        logger.propagate = self.propagate
 
         dispatcher = event_dispatcher(
             self.container.config,
@@ -161,6 +156,7 @@ class EntrypointLogger(DependencyProvider):
         self.worker_timestamps = WeakKeyDictionary()
 
     def worker_setup(self, worker_ctx):
+
         if not isinstance(worker_ctx.entrypoint, self.entrypoint_types):
             return
 
@@ -208,12 +204,6 @@ class EntrypointLogger(DependencyProvider):
             ) or tuple()  # can have attr set to None
             exc = exc_info[1]
             is_expected = isinstance(exc, expected_exceptions)
-
-            if is_expected:
-                level = logging.WARNING
-            else:
-                level = logging.ERROR
-            self.logger.log(level, 'Exception', exc_info=exc_info)
 
             try:
                 exc_repr = repr(exc)
