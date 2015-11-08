@@ -5,12 +5,11 @@ import socket
 from datetime import datetime
 from traceback import format_tb
 from weakref import WeakKeyDictionary
+
 from kombu import Connection
 from kombu.pools import connections, producers
 from nameko.constants import (
-    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
-    SERIALIZER_CONFIG_KEY
-)
+    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER, SERIALIZER_CONFIG_KEY)
 from nameko.events import EventHandler
 from nameko.extensions import DependencyProvider
 from nameko.messaging import AMQP_URI_CONFIG_KEY
@@ -20,23 +19,18 @@ from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
 
 
-class BroadcastLogHandler(logging.Handler):
-    # Broadcast log messages to RabbitMq queue
-    # TODO: Pre-queue in memory with eventlet.queue
-    def __init__(
-        self,
-        dispatcher
-    ):
-
-        self.dispatcher = dispatcher
-        logging.Handler.__init__(self)
-
-    def emit(self, message):
-        self.dispatcher(message.getMessage())
-
-
 class EntrypointLogger(DependencyProvider):
+    """ Log arguments, results and debugging information
+    of service entrypoints to RabbitMQ. Supported entrypoints: Rpc,
+    EventHandler and HttpRequestHandler.
+    """
+
     def __init__(self, exchange_name, routing_key, propagate=False):
+        """
+        :param exchange_name: exchange where events should be published to
+        :param routing_key: event routing key
+        :param propagate: propagate logs to the handlers of higher level
+        """
         self.exchange_name = exchange_name
         self.routing_key = routing_key
         self.propagate = propagate
@@ -56,7 +50,7 @@ class EntrypointLogger(DependencyProvider):
             self.exchange_name,
             self.routing_key
         )
-        handler = BroadcastLogHandler(dispatcher)
+        handler = EntrypointLoggingHandler(dispatcher)
         formatter = logging.Formatter('%(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -126,6 +120,20 @@ class EntrypointLogger(DependencyProvider):
                 'expected_error': is_expected,
             })
         self.logger.info(dumps(data))
+
+
+class EntrypointLoggingHandler(logging.Handler):
+
+    def __init__(
+        self,
+        dispatcher
+    ):
+
+        self.dispatcher = dispatcher
+        logging.Handler.__init__(self)
+
+    def emit(self, message):
+        self.dispatcher(message.getMessage())
 
 
 def default(obj):

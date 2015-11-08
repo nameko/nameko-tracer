@@ -4,16 +4,19 @@ from datetime import datetime
 
 import pytest
 from mock import MagicMock, Mock, patch
+from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
 from nameko.rpc import Rpc, rpc
+from nameko.testing.services import entrypoint_hook, entrypoint_waiter
 from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request
 
+
 from nameko_entrypoint_logger import (
-    BroadcastLogHandler, EntrypointLogger, event_dispatcher)
+    EntrypointLoggingHandler, EntrypointLogger, event_dispatcher)
 
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_event"
@@ -37,7 +40,7 @@ class Service(object):
 
     @event_handler("publisher", "routing_key")
     def handle_event(self, payload):
-        self.dispatch({'success': True})
+        pass
 
 
 @pytest.fixture
@@ -84,16 +87,34 @@ def http_worker_ctx(entrypoint_logger):
     )
 
 
+@pytest.fixture
+def event_worker_ctx(entrypoint_logger):
+    entrypoint = get_extension(
+        entrypoint_logger.container, EventHandler, method_name="handle_event"
+    )
+
+    return WorkerContext(
+        entrypoint_logger.container, Service, entrypoint, args=("bar",)
+    )
+
+
+@pytest.fixture
+def config():
+    return {
+        AMQP_URI_CONFIG_KEY: 'memory://'
+    }
+
+
 def test_setup(entrypoint_logger):
-    assert BroadcastLogHandler in [
+    assert EntrypointLoggingHandler in [
         type(handler) for handler in entrypoint_logger.logger.handlers
-        if type(handler) == BroadcastLogHandler]
+        if type(handler) == EntrypointLoggingHandler]
 
     assert entrypoint_logger.exchange_name == EXCHANGE_NAME
     assert entrypoint_logger.routing_key == ROUTING_KEY
 
 
-def test_will_only_process_request_from_known_entrypoints(
+def test_will_not_process_request_from_unknown_entrypoints(
     entrypoint_logger,
     mock_container
 ):
@@ -106,7 +127,7 @@ def test_will_only_process_request_from_known_entrypoints(
     assert not logger.info.called
 
 
-def test_will_only_process_results_from_known_entrypoints(
+def test_will_not_process_results_from_unknown_entrypoints(
     entrypoint_logger,
     mock_container
 ):
@@ -146,7 +167,7 @@ def test_rpc_response_is_logged(entrypoint_logger, rpc_worker_ctx):
     assert worker_data['result'] == '{"bar": "foo"}'
 
 
-def test_rpc_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
+def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     exception = Exception("Something went wrong")
     exc_info = (Exception, exception, exception.__traceback__)
 
@@ -167,7 +188,7 @@ def test_rpc_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     assert "Something went wrong" in str(worker_data['exc'])
 
 
-def test_rpc_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
+def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     exception = ValueError("Invalid value")
     exc_info = (Exception, exception, exception.__traceback__)
 
@@ -188,7 +209,7 @@ def test_rpc_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     assert "Invalid value" in str(worker_data['exc'])
 
 
-def test_can_fail_exception_repr(entrypoint_logger, rpc_worker_ctx):
+def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     exception = ValueError("Invalid value")
     mock_exception = Mock()
     mock_exception.__repr__ = lambda s: (_ for _ in ()).throw(Exception())
@@ -244,7 +265,7 @@ def test_http_response_is_logged(entrypoint_logger, http_worker_ctx):
     assert json.loads(worker_data['result']) == {'value': 1}
 
 
-def test_can_handle_non_json_results(entrypoint_logger, http_worker_ctx):
+def test_can_handle_invalid_json_results(entrypoint_logger, http_worker_ctx):
     entrypoint_logger.worker_timestamps[http_worker_ctx] = datetime.utcnow()
 
     with patch.object(entrypoint_logger, 'logger') as logger:
@@ -257,17 +278,43 @@ def test_can_handle_non_json_results(entrypoint_logger, http_worker_ctx):
     assert worker_data['result'] == "[json dump failed]"
 
 
-def test_event_handler_request_response_is_logged():
-    pass
+def test_event_handler_request_is_logged(
+    entrypoint_logger, event_worker_ctx
+):
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_setup(event_worker_ctx)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "EventHandler"
+    assert worker_data['call_args'] == {"payload": "bar"}
 
 
-def test_event_handler_exception_is_logged():
-    pass
+def test_event_handler_response_is_logged(
+    entrypoint_logger, event_worker_ctx
+):
+
+    entrypoint_logger.worker_timestamps[event_worker_ctx] = datetime.utcnow()
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(
+            event_worker_ctx, result=None)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "EventHandler"
+    assert worker_data['call_args'] == {"payload": "bar"}
+    assert worker_data['result'] == 'null'
 
 
-def test_can_log_broadcast_events():
+def test_entrypoint_logging_handler_will_dispatch_log_message():
     logger = logging.getLogger('test')
-    handler = BroadcastLogHandler(dispatcher)
+    handler = EntrypointLoggingHandler(dispatcher)
     logger.addHandler(handler)
     message = {'foo': 'bar'}
     logger.info(json.dumps(message))
@@ -278,14 +325,7 @@ def test_can_log_broadcast_events():
     assert json.loads(call_args) == message
 
 
-def test_will_dispatch_events():
-    from nameko.constants import (
-        AMQP_URI_CONFIG_KEY, SERIALIZER_CONFIG_KEY, DEFAULT_SERIALIZER)
-
-    config = {
-        SERIALIZER_CONFIG_KEY: DEFAULT_SERIALIZER,
-        AMQP_URI_CONFIG_KEY: 'memory://'
-    }
+def test_will_event_dispatcher_will_dispatch_logs(config):
 
     dispatcher = event_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
 
@@ -303,6 +343,25 @@ def test_will_dispatch_events():
     assert config['routing_key'] == ROUTING_KEY
 
 
-def test_end_to_end():
-    # Esure worker_setup and worker_result are called
-    pass
+def test_end_to_end(container_factory, config):
+
+    class TestService(object):
+        name = "service"
+
+        entrypoint_logger = EntrypointLogger(EXCHANGE_NAME, ROUTING_KEY)
+
+        @rpc
+        def rpc_method(self):
+            pass
+
+    container = container_factory(TestService, config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        with entrypoint_hook(container, 'rpc_method') as rpc_method:
+            with entrypoint_waiter(container, 'rpc_method'):
+                    rpc_method()
+
+    assert logger.info.call_count == 2
