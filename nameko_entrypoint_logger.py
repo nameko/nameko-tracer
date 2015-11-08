@@ -2,18 +2,15 @@ import inspect
 import json
 import logging
 import socket
-
 from datetime import datetime
 from traceback import format_tb
 from weakref import WeakKeyDictionary
-
 from kombu import Connection
 from kombu.pools import connections, producers
 from nameko.constants import (
     DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
     SERIALIZER_CONFIG_KEY
 )
-
 from nameko.events import EventHandler
 from nameko.extensions import DependencyProvider
 from nameko.messaging import AMQP_URI_CONFIG_KEY
@@ -23,93 +20,6 @@ from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
 
 
-def default(obj):
-    """Default JSON serializer."""
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise ValueError
-
-
-def dumps(obj):
-    return json.dumps(obj, default=default)
-
-
-def event_dispatcher(nameko_config, exchange_name, routing_key):
-    """ Return a function that dispatches nameko events.
-    """
-    def dispatch(event_data):
-        """ Dispatch an event claiming to originate from `service_name` with
-        the given `event_type` and `event_data`.
-        """
-        conn = Connection(nameko_config[AMQP_URI_CONFIG_KEY])
-
-        serializer = nameko_config.get(
-            SERIALIZER_CONFIG_KEY, DEFAULT_SERIALIZER)
-
-        exchange = get_event_exchange(exchange_name)
-
-        with connections[conn].acquire(block=True) as connection:
-            exchange.maybe_bind(connection)
-            with producers[conn].acquire(block=True) as producer:
-                msg = event_data
-                producer.publish(
-                    msg,
-                    exchange=exchange,
-                    declare=[exchange],
-                    serializer=serializer,
-                    routing_key=routing_key,
-                    retry=True,
-                    retry_policy=DEFAULT_RETRY_POLICY
-                )
-    return dispatch
-
-
-def parse_request(request):
-
-    return {
-        'content_type': request.content_type,
-        'url': request.url,
-        'cookies': request.cookies,
-        'method': request.method
-    }
-
-
-def get_worker_data(worker_ctx):
-
-    provider = worker_ctx.entrypoint
-    service_name = worker_ctx.service_name
-    provider_name = provider.method_name
-    entrypoint = "{}.{}".format(service_name, provider_name)
-
-    if hasattr(provider, 'sensitive_variables'):
-        redacted_callargs = get_redacted_args(
-            provider, *worker_ctx.args, **worker_ctx.kwargs)
-    else:
-        method = getattr(provider.container.service_cls, provider.method_name)
-        callargs = inspect.getcallargs(method, None, *worker_ctx.args, **worker_ctx.kwargs)
-        del callargs['self']
-        if 'request' in callargs:
-            callargs['request'] = parse_request(callargs['request'])
-        redacted_callargs = callargs
-
-    return {
-        'timestamp': datetime.utcnow(),
-        'provider': type(provider).__name__,
-        'hostname': socket.gethostname(),
-        'service': service_name,
-        'provider_name': provider_name,
-        'entrypoint': entrypoint,
-        'call_id': worker_ctx.call_id,
-        'call_stack': worker_ctx.call_id_stack,
-        'context_data': {
-            'language': worker_ctx.data.get('language'),
-            'user_id': worker_ctx.data.get('user_id'),
-            'user_agent': worker_ctx.data.get('user_agent'),
-        },
-        'call_args': redacted_callargs
-    }
-
-
 class BroadcastLogHandler(logging.Handler):
     # Broadcast log messages to RabbitMq queue
     # TODO: Pre-queue in memory with eventlet.queue
@@ -117,14 +27,12 @@ class BroadcastLogHandler(logging.Handler):
         self,
         dispatcher
     ):
+
         self.dispatcher = dispatcher
         logging.Handler.__init__(self)
 
     def emit(self, message):
         self.dispatcher(message.getMessage())
-
-    def flush(self):
-        pass
 
 
 class EntrypointLogger(DependencyProvider):
@@ -133,6 +41,7 @@ class EntrypointLogger(DependencyProvider):
         self.routing_key = routing_key
         self.propagate = propagate
         self.logger = None
+        self.worker_timestamps = WeakKeyDictionary()
 
     entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
 
@@ -153,7 +62,6 @@ class EntrypointLogger(DependencyProvider):
         logger.addHandler(handler)
 
         self.logger = logger
-        self.worker_timestamps = WeakKeyDictionary()
 
     def worker_setup(self, worker_ctx):
 
@@ -218,3 +126,96 @@ class EntrypointLogger(DependencyProvider):
                 'expected_error': is_expected,
             })
         self.logger.info(dumps(data))
+
+
+def default(obj):
+    """Default JSON serializer.
+    :param obj: datetime
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise ValueError
+
+
+def dumps(obj):
+    return json.dumps(obj, default=default)
+
+
+def event_dispatcher(nameko_config, exchange_name, routing_key):
+    """ Return a function that dispatches nameko events.
+    :param nameko_config: nameko configuration
+    :param exchange_name: exchange where events should be published to
+    :param routing_key: event routing key
+    """
+
+    def dispatch(event_data):
+        """ Dispatch an event
+        :param event_data: event payload
+        """
+        conn = Connection(nameko_config[AMQP_URI_CONFIG_KEY])
+
+        serializer = nameko_config.get(
+            SERIALIZER_CONFIG_KEY, DEFAULT_SERIALIZER)
+
+        exchange = get_event_exchange(exchange_name)
+
+        with connections[conn].acquire(block=True) as connection:
+            exchange.maybe_bind(connection)
+            with producers[conn].acquire(block=True) as producer:
+                msg = event_data
+                producer.publish(
+                    msg,
+                    exchange=exchange,
+                    declare=[exchange],
+                    serializer=serializer,
+                    routing_key=routing_key,
+                    retry=True,
+                    retry_policy=DEFAULT_RETRY_POLICY
+                )
+
+    return dispatch
+
+
+def get_worker_data(worker_ctx):
+    provider = worker_ctx.entrypoint
+    service_name = worker_ctx.service_name
+    provider_name = provider.method_name
+    entrypoint = "{}.{}".format(service_name, provider_name)
+
+    if hasattr(provider, 'sensitive_variables'):
+        redacted_callargs = get_redacted_args(
+            provider, *worker_ctx.args, **worker_ctx.kwargs)
+    else:
+        method = getattr(provider.container.service_cls, provider.method_name)
+        callargs = inspect.getcallargs(method, None, *worker_ctx.args,
+                                       **worker_ctx.kwargs)
+        del callargs['self']
+        if 'request' in callargs:
+            callargs['request'] = parse_request(callargs['request'])
+        redacted_callargs = callargs
+
+    return {
+        'timestamp': datetime.utcnow(),
+        'provider': type(provider).__name__,
+        'hostname': socket.gethostname(),
+        'service': service_name,
+        'provider_name': provider_name,
+        'entrypoint': entrypoint,
+        'call_id': worker_ctx.call_id,
+        'call_stack': worker_ctx.call_id_stack,
+        'context_data': {
+            'language': worker_ctx.data.get('language'),
+            'user_id': worker_ctx.data.get('user_id'),
+            'user_agent': worker_ctx.data.get('user_agent'),
+        },
+        'call_args': redacted_callargs
+    }
+
+
+def parse_request(request):
+    return {
+        'content_type': request.content_type,
+        'url': request.url,
+        'cookies': request.cookies,
+        'method': request.method
+    }
