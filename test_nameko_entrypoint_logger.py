@@ -357,7 +357,6 @@ def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
 def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     exception = ValueError("Invalid value")
     mock_exception = Mock()
-    mock_exception.__repr__ = lambda s: (_ for _ in ()).throw(Exception())
     exc_info = (Exception, mock_exception, exception.__traceback__)
 
     entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
@@ -371,7 +370,7 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
 
     worker_data = json.loads(call_args)
 
-    assert worker_data['exc'] == '[exc __repr__ failed]'
+    assert worker_data['exc'] == '[exc serialization failed]'
 
 
 def test_end_to_end(container_factory, config):

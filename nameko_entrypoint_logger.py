@@ -12,6 +12,7 @@ from nameko.constants import (
     DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER, SERIALIZER_CONFIG_KEY)
 from nameko.events import EventHandler
 from nameko.extensions import DependencyProvider
+from nameko.exceptions import safe_for_serialization, serialize
 from nameko.messaging import AMQP_URI_CONFIG_KEY
 from nameko.rpc import Rpc
 from nameko.standalone.events import get_event_exchange
@@ -93,11 +94,10 @@ class EntrypointLogger(DependencyProvider):
 
             if result:
                 try:
+                    result_bytes = len(result)
                     result_json = json.loads(result)
                 except Exception:
-                    result_json = str(result)
-
-                result_bytes = len(result)
+                    result_json = safe_for_serialization(result)
 
             data.update({
                 'status': 'success',
@@ -113,9 +113,9 @@ class EntrypointLogger(DependencyProvider):
             is_expected = isinstance(exc, expected_exceptions)
 
             try:
-                exc_repr = repr(exc)
+                exc_repr = serialize(exc)
             except Exception:
-                exc_repr = "[exc __repr__ failed]"
+                exc_repr = "[exc serialization failed]"
 
             data.update({
                 'status': 'error',
