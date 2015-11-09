@@ -87,12 +87,17 @@ class EntrypointLogger(DependencyProvider):
         })
 
         if exc_info is None:
-            try:
-                result_json = dumps(result)
-                result_bytes = len(result_json)
-            except Exception:
-                result_json = '[json dump failed]'
-                result_bytes = None
+
+            result_json = None
+            result_bytes = None
+
+            if result:
+                try:
+                    result_json = json.loads(result)
+                except Exception:
+                    result_json = str(result)
+
+                result_bytes = len(result)
 
             data.update({
                 'status': 'success',
@@ -199,7 +204,7 @@ def get_worker_data(worker_ctx):
                                        **worker_ctx.kwargs)
         del callargs['self']
         if 'request' in callargs:
-            callargs['request'] = parse_request(callargs['request'])
+            callargs['request'] = parse_http_request(callargs['request'])
         redacted_callargs = callargs
 
     return {
@@ -220,10 +225,21 @@ def get_worker_data(worker_ctx):
     }
 
 
-def parse_request(request):
-    return {
+def parse_http_request(request):
+
+    request_data = {
         'content_type': request.content_type,
         'url': request.url,
         'cookies': request.cookies,
         'method': request.method
     }
+
+    post_data = request.get_data(as_text=True)
+
+    if post_data:
+        try:
+            request_data['post_data'] = json.loads(post_data)
+        except ValueError:
+            request_data['post_data'] = post_data
+
+    return request_data

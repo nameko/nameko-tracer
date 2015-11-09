@@ -14,9 +14,8 @@ from nameko.web.handlers import HttpRequestHandler, http
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request
 
-
 from nameko_entrypoint_logger import (
-    EntrypointLoggingHandler, EntrypointLogger, event_dispatcher)
+    EntrypointLogger, EntrypointLoggingHandler, dumps, event_dispatcher)
 
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_event"
@@ -71,19 +70,25 @@ def rpc_worker_ctx(entrypoint_logger):
 
 
 @pytest.fixture
-def http_worker_ctx(entrypoint_logger):
-    entrypoint = get_extension(
+def http_entrypoint(entrypoint_logger):
+    return get_extension(
         entrypoint_logger.container,
         HttpRequestHandler,
         method_name="get_method"
     )
 
-    environ = create_environ('/get/1', 'http://localhost:8080/')
+@pytest.fixture
+def http_worker_ctx(entrypoint_logger, http_entrypoint):
+    environ = create_environ(
+        '/get/1',
+        'http://localhost:8080/',
+        data=json.dumps({'foo': 'bar'})
+    )
 
     request = Request(environ)
 
     return WorkerContext(
-        entrypoint_logger.container, Service, entrypoint, args=(request, 1)
+        entrypoint_logger.container, Service, http_entrypoint, args=(request, 1)
     )
 
 
@@ -156,7 +161,7 @@ def test_rpc_response_is_logged(entrypoint_logger, rpc_worker_ctx):
     entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
 
     with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(rpc_worker_ctx, result={'bar': 'foo'})
+        entrypoint_logger.worker_result(rpc_worker_ctx, result='{"bar": "foo"}')
 
     (call_args,), _ = logger.info.call_args
 
@@ -164,7 +169,146 @@ def test_rpc_response_is_logged(entrypoint_logger, rpc_worker_ctx):
 
     assert worker_data['provider'] == "Rpc"
     assert worker_data['call_args'] == {"foo": "bar"}
-    assert worker_data['result'] == '{"bar": "foo"}'
+    assert worker_data['result'] == {"bar": "foo"}
+
+
+def test_http_request_is_logged(entrypoint_logger, http_worker_ctx):
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_setup(http_worker_ctx)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "HttpRequestHandler"
+    assert worker_data['entrypoint'] == 'service.get_method'
+    assert worker_data['call_args'] == {
+        'request':
+            {
+                'method': 'GET',
+                'post_data': {'foo': 'bar'},
+                'content_type': '',
+                'cookies': {},
+                'url': 'http://localhost:8080/get/1'
+            },
+        'value': 1
+    }
+
+
+def test_http_response_is_logged(entrypoint_logger, http_worker_ctx):
+    entrypoint_logger.worker_timestamps[http_worker_ctx] = datetime.utcnow()
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(http_worker_ctx, result='{"value": 1}')
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "HttpRequestHandler"
+    assert worker_data['result'] == {'value': 1}
+
+
+def test_can_handle_none_json_request(entrypoint_logger, http_entrypoint):
+
+    environ = create_environ(
+        '/get/1',
+        'http://localhost:8080/',
+        data="foo"
+    )
+
+    request = Request(environ)
+
+    http_worker_ctx = WorkerContext(
+        entrypoint_logger.container, Service, http_entrypoint, args=(request, 1)
+    )
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_setup(http_worker_ctx)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['call_args']['request']['post_data'] == "foo"
+
+
+def test_can_handle_none_json_results(entrypoint_logger, http_worker_ctx):
+    entrypoint_logger.worker_timestamps[http_worker_ctx] = datetime.utcnow()
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(http_worker_ctx, result="abc")
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['result'] == "abc"
+
+
+def test_event_handler_request_is_logged(
+    entrypoint_logger, event_worker_ctx
+):
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_setup(event_worker_ctx)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "EventHandler"
+    assert worker_data['call_args'] == {"payload": "bar"}
+
+
+def test_event_handler_response_is_logged(
+    entrypoint_logger, event_worker_ctx
+):
+
+    entrypoint_logger.worker_timestamps[event_worker_ctx] = datetime.utcnow()
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(
+            event_worker_ctx, result=None)
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert worker_data['provider'] == "EventHandler"
+    assert worker_data['call_args'] == {"payload": "bar"}
+    assert worker_data['result'] is None
+
+
+def test_entrypoint_logging_handler_will_dispatch_log_message():
+    logger = logging.getLogger('test')
+    handler = EntrypointLoggingHandler(dispatcher)
+    logger.addHandler(handler)
+    message = {'foo': 'bar'}
+    logger.info(json.dumps(message))
+
+    (call_args,), _ = dispatcher.call_args
+
+    assert dispatcher.called
+    assert json.loads(call_args) == message
+
+
+def test_event_dispatcher_will_dispatch_logs(config):
+
+    dispatcher = event_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
+
+    from mock import ANY
+
+    message = {'foo': 'bar'}
+
+    with patch('nameko_entrypoint_logger.producers') as mock_producers:
+        with mock_producers[ANY].acquire(block=True) as mock_producer:
+            dispatcher(json.dumps(message))
+
+    (msg,), config = mock_producer.publish.call_args
+
+    assert json.loads(msg) == message
+    assert config['routing_key'] == ROUTING_KEY
 
 
 def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
@@ -229,120 +373,6 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     assert worker_data['exc'] == '[exc __repr__ failed]'
 
 
-def test_http_request_is_logged(entrypoint_logger, http_worker_ctx):
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_setup(http_worker_ctx)
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['provider'] == "HttpRequestHandler"
-    assert worker_data['entrypoint'] == 'service.get_method'
-    assert worker_data['call_args'] == {
-        'request':
-            {
-                'method': 'GET',
-                'content_type': '',
-                'cookies': {},
-                'url': 'http://localhost:8080/get/1'
-            },
-        'value': 1
-    }
-
-
-def test_http_response_is_logged(entrypoint_logger, http_worker_ctx):
-    entrypoint_logger.worker_timestamps[http_worker_ctx] = datetime.utcnow()
-
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(http_worker_ctx, result={'value': 1})
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['provider'] == "HttpRequestHandler"
-    assert json.loads(worker_data['result']) == {'value': 1}
-
-
-def test_can_handle_invalid_json_results(entrypoint_logger, http_worker_ctx):
-    entrypoint_logger.worker_timestamps[http_worker_ctx] = datetime.utcnow()
-
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(http_worker_ctx, result={None})
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['result'] == "[json dump failed]"
-
-
-def test_event_handler_request_is_logged(
-    entrypoint_logger, event_worker_ctx
-):
-
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_setup(event_worker_ctx)
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['provider'] == "EventHandler"
-    assert worker_data['call_args'] == {"payload": "bar"}
-
-
-def test_event_handler_response_is_logged(
-    entrypoint_logger, event_worker_ctx
-):
-
-    entrypoint_logger.worker_timestamps[event_worker_ctx] = datetime.utcnow()
-
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(
-            event_worker_ctx, result=None)
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['provider'] == "EventHandler"
-    assert worker_data['call_args'] == {"payload": "bar"}
-    assert worker_data['result'] == 'null'
-
-
-def test_entrypoint_logging_handler_will_dispatch_log_message():
-    logger = logging.getLogger('test')
-    handler = EntrypointLoggingHandler(dispatcher)
-    logger.addHandler(handler)
-    message = {'foo': 'bar'}
-    logger.info(json.dumps(message))
-
-    (call_args,), _ = dispatcher.call_args
-
-    assert dispatcher.called
-    assert json.loads(call_args) == message
-
-
-def test_will_event_dispatcher_will_dispatch_logs(config):
-
-    dispatcher = event_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
-
-    from mock import ANY
-
-    message = {'foo': 'bar'}
-
-    with patch('nameko_entrypoint_logger.producers') as mock_producers:
-        with mock_producers[ANY].acquire(block=True) as mock_producer:
-            dispatcher(json.dumps(message))
-
-    (msg,), config = mock_producer.publish.call_args
-
-    assert json.loads(msg) == message
-    assert config['routing_key'] == ROUTING_KEY
-
-
 def test_end_to_end(container_factory, config):
 
     class TestService(object):
@@ -365,3 +395,8 @@ def test_end_to_end(container_factory, config):
                     rpc_method()
 
     assert logger.info.call_count == 2
+
+
+def test_default_json_serializer_will_raise_value_error():
+    with pytest.raises(ValueError):
+        dumps({'weird_value': {None}})
