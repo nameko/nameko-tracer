@@ -15,7 +15,8 @@ from werkzeug.test import create_environ
 from werkzeug.wrappers import Request
 
 from nameko_entrypoint_logger import (
-    EntrypointLogger, EntrypointLoggingHandler, dumps, event_dispatcher)
+    EntrypointLogger, EntrypointLoggingHandler,
+    dumps, event_dispatcher, get_worker_data)
 
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_event"
