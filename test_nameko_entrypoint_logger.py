@@ -392,7 +392,7 @@ def test_end_to_end(container_factory, config):
     with patch.object(logger, 'logger') as logger:
         with entrypoint_hook(container, 'rpc_method') as rpc_method:
             with entrypoint_waiter(container, 'rpc_method'):
-                    rpc_method()
+                rpc_method()
 
     assert logger.info.call_count == 2
 
@@ -400,3 +400,13 @@ def test_end_to_end(container_factory, config):
 def test_default_json_serializer_will_raise_value_error():
     with pytest.raises(ValueError):
         dumps({'weird_value': {None}})
+
+
+def test_can_handle_exception_when_getting_worker_data():
+    worker_ctx = Mock()
+    error_message = "Something went wrong."
+    with patch('nameko_entrypoint_logger.hasattr') as hasattr_mock:
+        hasattr_mock.side_effect = Exception(error_message)
+        data = get_worker_data(worker_ctx)
+
+    assert error_message in data['error']

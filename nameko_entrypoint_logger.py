@@ -190,43 +190,49 @@ def event_dispatcher(nameko_config, exchange_name, routing_key):
 
 
 def get_worker_data(worker_ctx):
-    provider = worker_ctx.entrypoint
-    service_name = worker_ctx.service_name
-    provider_name = provider.method_name
-    entrypoint = "{}.{}".format(service_name, provider_name)
+    try:
+        provider = worker_ctx.entrypoint
+        service_name = worker_ctx.service_name
+        provider_name = provider.method_name
+        entrypoint = "{}.{}".format(service_name, provider_name)
 
-    if hasattr(provider, 'sensitive_variables'):
-        redacted_callargs = get_redacted_args(
-            provider, *worker_ctx.args, **worker_ctx.kwargs)
-    else:
-        method = getattr(provider.container.service_cls, provider.method_name)
-        callargs = inspect.getcallargs(method, None, *worker_ctx.args,
-                                       **worker_ctx.kwargs)
-        del callargs['self']
-        if 'request' in callargs:
-            callargs['request'] = parse_http_request(callargs['request'])
-        redacted_callargs = callargs
+        if hasattr(provider, 'sensitive_variables'):
+            redacted_callargs = get_redacted_args(
+                provider, *worker_ctx.args, **worker_ctx.kwargs)
+        else:
+            method = getattr(provider.container.service_cls,
+                             provider.method_name)
+            callargs = inspect.getcallargs(method, None, *worker_ctx.args,
+                                           **worker_ctx.kwargs)
+            del callargs['self']
+            if 'request' in callargs:
+                callargs['request'] = parse_http_request(callargs['request'])
+            redacted_callargs = callargs
 
-    return {
-        'timestamp': datetime.utcnow(),
-        'provider': type(provider).__name__,
-        'hostname': socket.gethostname(),
-        'service': service_name,
-        'provider_name': provider_name,
-        'entrypoint': entrypoint,
-        'call_id': worker_ctx.call_id,
-        'call_stack': worker_ctx.call_id_stack,
-        'context_data': {
-            'language': worker_ctx.data.get('language'),
-            'user_id': worker_ctx.data.get('user_id'),
-            'user_agent': worker_ctx.data.get('user_agent'),
-        },
-        'call_args': redacted_callargs
-    }
+        data = {
+            'timestamp': datetime.utcnow(),
+            'provider': type(provider).__name__,
+            'hostname': socket.gethostname(),
+            'service': service_name,
+            'provider_name': provider_name,
+            'entrypoint': entrypoint,
+            'call_id': worker_ctx.call_id,
+            'call_stack': worker_ctx.call_id_stack,
+            'context_data': {
+                'language': worker_ctx.data.get('language'),
+                'user_id': worker_ctx.data.get('user_id'),
+                'user_agent': worker_ctx.data.get('user_agent'),
+            },
+            'call_args': redacted_callargs
+        }
+    except Exception as exc:
+        data = {
+            'error': "Error when gathering worker data: {}".format(str(exc))
+        }
+    return data
 
 
 def parse_http_request(request):
-
     request_data = {
         'content_type': request.content_type,
         'url': request.url,
