@@ -28,6 +28,8 @@ class EntrypointLogger(DependencyProvider):
     EventHandler and HttpRequestHandler.
     """
 
+    entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
+
     def __init__(self, propagate=False):
         """
         :param exchange_name: exchange where events should be published to
@@ -37,8 +39,6 @@ class EntrypointLogger(DependencyProvider):
         self.propagate = propagate
         self.logger = None
         self.worker_timestamps = WeakKeyDictionary()
-
-    entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
 
     def setup(self):
 

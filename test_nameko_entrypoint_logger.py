@@ -25,12 +25,14 @@ EVENT_TYPE = "monitoring_log"
 dispatcher = MagicMock()
 
 
+class CustomException(Exception):
+    pass
+
+
 class Service(object):
     name = "service"
 
-    dispatch = dispatcher
-
-    @rpc(expected_exceptions=ValueError)
+    @rpc(expected_exceptions=CustomException)
     def rpc_method(self, foo):
         pass
 
@@ -39,7 +41,7 @@ class Service(object):
         payload = {'value': value}
         return json.dumps(payload)
 
-    @event_handler("publisher", "routing_key")
+    @event_handler("publisher", "property_updated")
     def handle_event(self, payload):
         pass
 
@@ -395,8 +397,8 @@ def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
 
 
 def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
-    exception = ValueError("Invalid value")
-    exc_info = (Exception, exception, exception.__traceback__)
+    exception = CustomException("Invalid value")
+    exc_info = (CustomException, exception, exception.__traceback__)
 
     entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
 

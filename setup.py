@@ -22,5 +22,5 @@ setup(
     },
     dependency_links=[],
     zip_safe=True,
-    license='??'
+    license='Apache License, Version 2.0'
 )
