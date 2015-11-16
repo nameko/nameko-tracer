@@ -5,19 +5,21 @@ import socket
 from datetime import datetime
 from traceback import format_tb
 from weakref import WeakKeyDictionary
-
-from kombu import Connection
+import six
+from kombu import Connection, Exchange
 from kombu.pools import connections, producers
 from nameko.constants import (
-    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER, SERIALIZER_CONFIG_KEY)
+    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
+    SERIALIZER_CONFIG_KEY
+)
 from nameko.events import EventHandler
-from nameko.extensions import DependencyProvider
 from nameko.exceptions import safe_for_serialization, serialize
+from nameko.extensions import DependencyProvider
 from nameko.messaging import AMQP_URI_CONFIG_KEY
 from nameko.rpc import Rpc
-from nameko.standalone.events import get_event_exchange
 from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
+from werkzeug.wrappers import Response
 
 
 class EntrypointLogger(DependencyProvider):
@@ -26,14 +28,12 @@ class EntrypointLogger(DependencyProvider):
     EventHandler and HttpRequestHandler.
     """
 
-    def __init__(self, exchange_name, routing_key, propagate=False):
+    def __init__(self, propagate=False):
         """
         :param exchange_name: exchange where events should be published to
         :param routing_key: event routing key
         :param propagate: propagate logs to the handlers of higher level
         """
-        self.exchange_name = exchange_name
-        self.routing_key = routing_key
         self.propagate = propagate
         self.logger = None
         self.worker_timestamps = WeakKeyDictionary()
@@ -42,14 +42,19 @@ class EntrypointLogger(DependencyProvider):
 
     def setup(self):
 
+        entrypoint_config = self.container.config['ENTRYPOINT_LOGGING']
+
+        exchange_name = entrypoint_config['EXCHANGE_NAME']
+        routing_key = entrypoint_config['EVENT_TYPE']
+
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
         logger.propagate = self.propagate
 
-        dispatcher = event_dispatcher(
+        dispatcher = logging_dispatcher(
             self.container.config,
-            self.exchange_name,
-            self.routing_key
+            exchange_name,
+            routing_key
         )
         handler = EntrypointLoggingHandler(dispatcher)
         formatter = logging.Formatter('%(message)s')
@@ -64,6 +69,7 @@ class EntrypointLogger(DependencyProvider):
             return
 
         data = get_worker_data(worker_ctx)
+
         data.update({
             'lifecycle_stage': 'request',
         })
@@ -89,21 +95,17 @@ class EntrypointLogger(DependencyProvider):
 
         if exc_info is None:
 
-            result_json = None
-            result_bytes = None
+            data['status'] = 'success'
 
-            if result:
-                try:
-                    result_bytes = len(result)
-                    result_json = json.loads(result)
-                except Exception:
-                    result_json = safe_for_serialization(result)
-
-            data.update({
-                'status': 'success',
-                'result_bytes': result_bytes,
-                'result': result_json,
-            })
+            if isinstance(result, Response):
+                data['http_response'] = get_http_response(result)
+            else:
+                result_string = to_string(safe_for_serialization(result))
+                result_bytes = len(result_string)
+                data.update({
+                    'result_bytes': result_bytes,
+                    'result': result_string,
+                })
         else:
 
             expected_exceptions = getattr(
@@ -124,16 +126,12 @@ class EntrypointLogger(DependencyProvider):
                 'traceback': ''.join(format_tb(exc_info[2])),
                 'expected_error': is_expected,
             })
+
         self.logger.info(dumps(data))
 
 
 class EntrypointLoggingHandler(logging.Handler):
-
-    def __init__(
-        self,
-        dispatcher
-    ):
-
+    def __init__(self, dispatcher):
         self.dispatcher = dispatcher
         logging.Handler.__init__(self)
 
@@ -154,7 +152,7 @@ def dumps(obj):
     return json.dumps(obj, default=default)
 
 
-def event_dispatcher(nameko_config, exchange_name, routing_key):
+def logging_dispatcher(nameko_config, exchange_name, routing_key):
     """ Return a function that dispatches nameko events.
     :param nameko_config: nameko configuration
     :param exchange_name: exchange where events should be published to
@@ -170,7 +168,7 @@ def event_dispatcher(nameko_config, exchange_name, routing_key):
         serializer = nameko_config.get(
             SERIALIZER_CONFIG_KEY, DEFAULT_SERIALIZER)
 
-        exchange = get_event_exchange(exchange_name)
+        exchange = Exchange(exchange_name)
 
         with connections[conn].acquire(block=True) as connection:
             exchange.maybe_bind(connection)
@@ -190,27 +188,38 @@ def event_dispatcher(nameko_config, exchange_name, routing_key):
 
 
 def get_worker_data(worker_ctx):
+    data = {
+        'timestamp': datetime.utcnow()
+    }
+
     try:
         provider = worker_ctx.entrypoint
         service_name = worker_ctx.service_name
         provider_name = provider.method_name
         entrypoint = "{}.{}".format(service_name, provider_name)
 
+        call_args = None
+
         if hasattr(provider, 'sensitive_variables'):
             redacted_callargs = get_redacted_args(
                 provider, *worker_ctx.args, **worker_ctx.kwargs)
+
+            call_args = {
+                'redacted_callargs': to_string(redacted_callargs)
+            }
+
         else:
             method = getattr(provider.container.service_cls,
                              provider.method_name)
-            callargs = inspect.getcallargs(method, None, *worker_ctx.args,
-                                           **worker_ctx.kwargs)
-            del callargs['self']
-            if 'request' in callargs:
-                callargs['request'] = parse_http_request(callargs['request'])
-            redacted_callargs = callargs
+            call_info = inspect.getcallargs(
+                method, None, *worker_ctx.args, **worker_ctx.kwargs)
 
-        data = {
-            'timestamp': datetime.utcnow(),
+            del call_info['self']
+
+            if 'request' in call_info:
+                call_args = get_http_request(call_info['request'])
+
+        data.update({
             'provider': type(provider).__name__,
             'hostname': socket.gethostname(),
             'service': service_name,
@@ -223,29 +232,61 @@ def get_worker_data(worker_ctx):
                 'user_id': worker_ctx.data.get('user_id'),
                 'user_agent': worker_ctx.data.get('user_agent'),
             },
-            'call_args': redacted_callargs
-        }
+            'call_args': call_args
+        })
     except Exception as exc:
-        data = {
+        data.update({
             'error': "Error when gathering worker data: {}".format(str(exc))
-        }
+        })
     return data
 
 
-def parse_http_request(request):
-    request_data = {
-        'content_type': request.content_type,
+def get_http_request(request):
+    data = request.data or request.form
+    return {
         'url': request.url,
-        'cookies': request.cookies,
-        'method': request.method
+        'method': request.method,
+        'data': to_string(data),
+        'headers': dict(get_headers(request.environ)),
+        'env': dict(get_environ(request.environ)),
     }
 
-    post_data = request.get_data(as_text=True)
 
-    if post_data:
-        try:
-            request_data['post_data'] = json.loads(post_data)
-        except ValueError:
-            request_data['post_data'] = post_data
+def get_http_response(response):
+    return {
+        'content_type': response.content_type,
+        'data': to_string(response.get_data()),
+        'status_code': response.status_code,
+        'content_length': response.content_length,
+    }
 
-    return request_data
+
+def get_headers(environ):
+    """
+    Returns only proper HTTP headers.
+    """
+    for key, value in six.iteritems(environ):
+        key = str(key)
+        if key.startswith('HTTP_') and key not in \
+            ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
+            yield key[5:].replace('_', '-').title(), value
+        elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
+            yield key.replace('_', '-').title(), value
+
+
+def get_environ(environ):
+    """
+    Returns our whitelisted environment variables.
+    """
+    for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
+        if key in environ:
+            yield key, environ[key]
+
+
+def to_string(value):
+    if isinstance(value, six.string_types):
+        return value
+    if isinstance(value, dict):
+        return json.dumps(value)
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
