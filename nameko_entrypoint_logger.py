@@ -32,8 +32,6 @@ class EntrypointLogger(DependencyProvider):
 
     def __init__(self, propagate=False):
         """
-        :param exchange_name: exchange where events should be published to
-        :param routing_key: event routing key
         :param propagate: propagate logs to the handlers of higher level
         """
         self.propagate = propagate
@@ -68,11 +66,8 @@ class EntrypointLogger(DependencyProvider):
         if not isinstance(worker_ctx.entrypoint, self.entrypoint_types):
             return
 
-        data = get_worker_data(worker_ctx)
-
-        data.update({
-            'lifecycle_stage': 'request',
-        })
+        data = {'lifecycle_stage': 'request'}
+        data.update(get_worker_data(worker_ctx))
 
         self.logger.info(dumps(data))
 
