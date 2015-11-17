@@ -115,11 +115,11 @@ Sample Message: Lifecycle Stage: **response**
     },
     "status": "success",
     "response_time": 0.002317,
-    "http_response": {
-        "content_type": "application/json",
-        "content_length": 17,
-        "status_code": 200,
-        "data": "{\"success\": true}"
+    "return_args": {
+    	"result": "{\"success\": true}",
+    	"content_type": "application/json",
+    	"status_code": 200,
+    	"result_bytes": 17
     },
     "call_id": "service_a.post_method.e5288a58-b738-4a0a-8bfc-a6f8aec7564f",
     "timestamp": "2015-11-16T18:19:01.864156",
