@@ -261,12 +261,13 @@ def test_can_process_results(
 ):
     response = process_response(result)
 
-    assert response['result'] == result_serialized
-    assert response['result_bytes'] == result_bytes
+    return_args = response['return_args']
+    assert return_args['result'] == result_serialized
+    assert return_args['result_bytes'] == result_bytes
     if status_code is not None:
-        assert response['status_code'] == status_code
+        assert return_args['status_code'] == status_code
     if content_type is not None:
-        assert response['content_type'] == content_type
+        assert return_args['content_type'] == content_type
 
 
 @pytest.mark.parametrize('data,serialized_data,content_type', [
