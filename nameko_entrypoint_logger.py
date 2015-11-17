@@ -236,14 +236,14 @@ def process_response(result):
     data = {}
 
     if isinstance(result, Response):
-        data.update(get_http_response(result))
+        data['return_args'] = get_http_response(result)
     else:
         result_string = to_string(safe_for_serialization(result))
         result_bytes = len(result_string)
-        data.update({
+        data['return_args'] = {
             'result_bytes': result_bytes,
             'result': result_string,
-        })
+        }
     return data
 
 
