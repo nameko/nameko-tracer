@@ -66,8 +66,11 @@ class EntrypointLogger(DependencyProvider):
         if not isinstance(worker_ctx.entrypoint, self.entrypoint_types):
             return
 
-        data = {'lifecycle_stage': 'request'}
-        data.update(get_worker_data(worker_ctx))
+        data = get_worker_data(worker_ctx)
+
+        data.update({
+            'lifecycle_stage': 'request'
+        })
 
         self.logger.info(dumps(data))
 
@@ -79,50 +82,34 @@ class EntrypointLogger(DependencyProvider):
             return
 
         data = get_worker_data(worker_ctx)
-        now = data['timestamp']
-        worker_setup_time = self.worker_timestamps[worker_ctx]
-        response_time = (now - worker_setup_time).total_seconds()
+
+        response_time = self.calculate_response_time(data, worker_ctx)
 
         data.update({
             'lifecycle_stage': 'response',
-            'response_time': response_time,
+            'response_time': response_time
         })
 
         if exc_info is None:
 
             data['status'] = 'success'
 
-            if isinstance(result, Response):
-                data['http_response'] = get_http_response(result)
-            else:
-                result_string = to_string(safe_for_serialization(result))
-                result_bytes = len(result_string)
-                data.update({
-                    'result_bytes': result_bytes,
-                    'result': result_string,
-                })
+            data.update(
+                process_response(result)
+            )
         else:
 
-            expected_exceptions = getattr(
-                worker_ctx.entrypoint, 'expected_exceptions', None
-            ) or tuple()  # can have attr set to None
-            exc = exc_info[1]
-            is_expected = isinstance(exc, expected_exceptions)
+            data['status'] = 'error'
 
-            try:
-                exc_repr = serialize(exc)
-            except Exception:
-                exc_repr = "[exc serialization failed]"
-
-            data.update({
-                'status': 'error',
-                'exc_type': exc_info[0].__name__,
-                'exc': exc_repr,
-                'traceback': ''.join(format_tb(exc_info[2])),
-                'expected_error': is_expected,
-            })
-
+            data.update(
+                process_exception(worker_ctx, exc_info)
+            )
         self.logger.info(dumps(data))
+
+    def calculate_response_time(self, data, worker_ctx):
+        now = data['timestamp']
+        worker_setup_time = self.worker_timestamps[worker_ctx]
+        return (now - worker_setup_time).total_seconds()
 
 
 class EntrypointLoggingHandler(logging.Handler):
@@ -193,8 +180,6 @@ def get_worker_data(worker_ctx):
         provider_name = provider.method_name
         entrypoint = "{}.{}".format(service_name, provider_name)
 
-        call_args = None
-
         if hasattr(provider, 'sensitive_variables'):
             redacted_callargs = get_redacted_args(
                 provider, *worker_ctx.args, **worker_ctx.kwargs)
@@ -204,15 +189,11 @@ def get_worker_data(worker_ctx):
             }
 
         else:
-            method = getattr(provider.container.service_cls,
-                             provider.method_name)
-            call_info = inspect.getcallargs(
-                method, None, *worker_ctx.args, **worker_ctx.kwargs)
+            # TODO: HttpRequestHandler should support sensitive_variables
+            call_args = get_args(worker_ctx)
 
-            del call_info['self']
-
-            if 'request' in call_info:
-                call_args = get_http_request(call_info['request'])
+            if 'request' in call_args:
+                call_args = get_http_request(call_args['request'])
 
         data.update({
             'provider': type(provider).__name__,
@@ -236,6 +217,56 @@ def get_worker_data(worker_ctx):
     return data
 
 
+def get_args(worker_ctx):
+    """Get arguments passed to worker container method)"""
+
+    provider = worker_ctx.entrypoint
+    method = getattr(provider.container.service_cls, provider.method_name)
+
+    call_args = inspect.getcallargs(
+        method, None, *worker_ctx.args, **worker_ctx.kwargs
+    )
+
+    del call_args['self']
+
+    return call_args
+
+
+def process_response(result):
+    data = {}
+
+    if isinstance(result, Response):
+        data.update(get_http_response(result))
+    else:
+        result_string = to_string(safe_for_serialization(result))
+        result_bytes = len(result_string)
+        data.update({
+            'result_bytes': result_bytes,
+            'result': result_string,
+        })
+    return data
+
+
+def process_exception(worker_ctx, exc_info):
+    expected_exceptions = getattr(
+        worker_ctx.entrypoint, 'expected_exceptions', None
+    ) or tuple()  # can have attr set to None
+    exc = exc_info[1]
+    is_expected = isinstance(exc, expected_exceptions)
+
+    try:
+        exc_repr = serialize(exc)
+    except Exception:
+        exc_repr = "[exc serialization failed]"
+
+    return {
+        'exc_type': exc_info[0].__name__,
+        'exc': exc_repr,
+        'traceback': ''.join(format_tb(exc_info[2])),
+        'expected_error': is_expected,
+    }
+
+
 def get_http_request(request):
     data = request.data or request.form
     return {
@@ -250,9 +281,9 @@ def get_http_request(request):
 def get_http_response(response):
     return {
         'content_type': response.content_type,
-        'data': to_string(response.get_data()),
+        'result': to_string(response.get_data()),
         'status_code': response.status_code,
-        'content_length': response.content_length,
+        'result_bytes': response.content_length,
     }
 
 
