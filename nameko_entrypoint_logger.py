@@ -185,15 +185,21 @@ def get_worker_data(worker_ctx):
                 provider, *worker_ctx.args, **worker_ctx.kwargs)
 
             call_args = {
-                'redacted_callargs': to_string(redacted_callargs)
+                'redacted_args': to_string(redacted_callargs)
             }
 
         else:
             # TODO: HttpRequestHandler should support sensitive_variables
-            call_args = get_args(worker_ctx)
+            args = get_args(worker_ctx)
 
-            if 'request' in call_args:
-                call_args = get_http_request(call_args['request'])
+            call_args = {}
+
+            if 'request' in args:
+                call_args['request'] = get_http_request(
+                    args.pop('request')
+                )
+
+            call_args['args'] = to_string(safe_for_serialization(args))
 
         data.update({
             'provider': type(provider).__name__,

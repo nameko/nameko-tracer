@@ -223,7 +223,7 @@ def test_will_get_event_worker_redacted_callargs(event_worker_ctx):
     data = get_worker_data(event_worker_ctx)
 
     assert data['call_args'] == {
-        'redacted_callargs': '{"payload": "bar"}'
+        'redacted_args': '{"payload": "bar"}'
     }
 
 
@@ -231,7 +231,7 @@ def test_will_get_rpc_worker_redacted_callargs(rpc_worker_ctx):
     data = get_worker_data(rpc_worker_ctx)
 
     assert data['call_args'] == {
-        'redacted_callargs': '{"foo": "bar"}'
+        'redacted_args': '{"foo": "bar"}'
     }
 
 
