@@ -301,9 +301,9 @@ def get_headers(environ):
         key = str(key)
         if key.startswith('HTTP_') and key not in \
             ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
-            yield key[5:].replace('_', '-').title(), value
+            yield key[5:].lower(), value
         elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
-            yield key.replace('_', '-').title(), value
+            yield key.lower(), value
 
 
 def get_environ(environ):
@@ -312,7 +312,7 @@ def get_environ(environ):
     """
     for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
         if key in environ:
-            yield key, environ[key]
+            yield key.lower(), environ[key]
 
 
 def to_string(value):
