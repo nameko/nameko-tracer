@@ -287,7 +287,7 @@ def test_can_get_http_call_args(data, serialized_data, content_type):
 
     request_call_args = get_http_request(request)
     assert request_call_args['data'] == serialized_data
-    assert request_call_args['headers']['Content-Type'] == content_type
+    assert request_call_args['headers']['content_type'] == content_type
 
 
 def test_entrypoint_logging_handler_will_dispatch_log_message():
