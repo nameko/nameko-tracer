@@ -31,8 +31,11 @@ class EntrypointLogger(DependencyProvider):
     entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
 
     def __init__(self, propagate=False):
-        """
-        :param propagate: propagate logs to the handlers of higher level
+        """Initialise EntrypointLogger.
+
+        :Parameters:
+            propagate: bool
+                Enable logs propagation to the handlers of higher level.
         """
         self.propagate = propagate
         self.logger = None
@@ -43,7 +46,7 @@ class EntrypointLogger(DependencyProvider):
         entrypoint_config = self.container.config['ENTRYPOINT_LOGGING']
 
         exchange_name = entrypoint_config['EXCHANGE_NAME']
-        routing_key = entrypoint_config['EVENT_TYPE']
+        routing_key = entrypoint_config['ROUTING_KEY']
 
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
@@ -115,7 +118,7 @@ class EntrypointLogger(DependencyProvider):
 class EntrypointLoggingHandler(logging.Handler):
     def __init__(self, dispatcher):
         self.dispatcher = dispatcher
-        logging.Handler.__init__(self)
+        super(EntrypointLoggingHandler, self).__init__()
 
     def emit(self, message):
         self.dispatcher(message.getMessage())
@@ -123,7 +126,9 @@ class EntrypointLoggingHandler(logging.Handler):
 
 def default(obj):
     """Default JSON serializer.
-    :param obj: datetime
+
+    :Parameters:
+        obj: Might be a datetime
     """
     if isinstance(obj, datetime):
         return obj.isoformat()
@@ -136,14 +141,22 @@ def dumps(obj):
 
 def logging_dispatcher(nameko_config, exchange_name, routing_key):
     """ Return a function that dispatches nameko events.
-    :param nameko_config: nameko configuration
-    :param exchange_name: exchange where events should be published to
-    :param routing_key: event routing key
+
+    :Parameters:
+        nameko_config: dict
+            Nameko configuration
+        exchange_name: str
+            Exchange where events should be published to
+        routing_key: str
+            Event routing key
     """
 
     def dispatch(event_data):
         """ Dispatch an event
-        :param event_data: event payload
+
+        :Parameters:
+            event_data: dict
+                event payload
         """
         conn = Connection(nameko_config[AMQP_URI_CONFIG_KEY])
 
@@ -190,7 +203,9 @@ def get_worker_data(worker_ctx):
 
         else:
             # TODO: HttpRequestHandler should support sensitive_variables
-            args = get_args(worker_ctx)
+            # Also get_redacted_args should be tolerant of
+            # entrypoints that don't define them
+            args = get_entrypoint_call_args(worker_ctx)
 
             call_args = {}
 
@@ -223,7 +238,7 @@ def get_worker_data(worker_ctx):
     return data
 
 
-def get_args(worker_ctx):
+def get_entrypoint_call_args(worker_ctx):
     """Get arguments passed to worker container method)"""
 
     provider = worker_ctx.entrypoint

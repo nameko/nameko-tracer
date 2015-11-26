@@ -2,7 +2,6 @@ import json
 import logging
 import socket
 from datetime import datetime
-
 import pytest
 from mock import ANY, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
@@ -14,14 +13,13 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
-
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
     get_worker_data, logging_dispatcher, process_response
 )
 
 EXCHANGE_NAME = "logging_exchange"
-EVENT_TYPE = "monitoring_log"
+ROUTING_KEY = "monitoring_log"
 
 dispatcher = MagicMock()
 
@@ -32,6 +30,8 @@ class CustomException(Exception):
 
 class Service(object):
     name = "service"
+
+    entrypoint_logger = EntrypointLogger()
 
     @rpc(expected_exceptions=CustomException)
     def rpc_method(self, foo):
@@ -53,7 +53,7 @@ def config():
         AMQP_URI_CONFIG_KEY: 'memory://',
         'ENTRYPOINT_LOGGING': {
             'EXCHANGE_NAME': EXCHANGE_NAME,
-            'EVENT_TYPE': EVENT_TYPE
+            'ROUTING_KEY': ROUTING_KEY
         }
     }
 
@@ -65,7 +65,7 @@ def container(container_factory, config):
 
 @pytest.fixture
 def entrypoint_logger(container):
-    logger = EntrypointLogger().bind(container, "service")
+    logger = get_extension(container, EntrypointLogger)
 
     logger.setup()
 
@@ -73,27 +73,25 @@ def entrypoint_logger(container):
 
 
 @pytest.fixture
-def rpc_worker_ctx(entrypoint_logger):
+def rpc_worker_ctx(container):
     entrypoint = get_extension(
-        entrypoint_logger.container, Rpc, method_name="rpc_method"
+        container, Rpc, method_name="rpc_method"
     )
 
     return WorkerContext(
-        entrypoint_logger.container, Service, entrypoint, args=("bar",)
+        container, Service, entrypoint, args=("bar",)
     )
 
 
 @pytest.fixture
-def http_entrypoint(entrypoint_logger):
+def http_entrypoint(container):
     return get_extension(
-        entrypoint_logger.container,
-        HttpRequestHandler,
-        method_name="get_method"
+        container, HttpRequestHandler, method_name="get_method"
     )
 
 
 @pytest.fixture
-def http_worker_ctx(entrypoint_logger, http_entrypoint):
+def http_worker_ctx(container, http_entrypoint):
     environ = create_environ(
         '/get/1?test=123',
         'http://localhost:8080/',
@@ -104,18 +102,18 @@ def http_worker_ctx(entrypoint_logger, http_entrypoint):
     request = Request(environ)
 
     return WorkerContext(
-        entrypoint_logger.container, Service, http_entrypoint, args=(request, 1)
+        container, Service, http_entrypoint, args=(request, 1)
     )
 
 
 @pytest.fixture
-def event_worker_ctx(entrypoint_logger):
+def event_worker_ctx(container):
     entrypoint = get_extension(
-        entrypoint_logger.container, EventHandler, method_name="handle_event"
+        container, EventHandler, method_name="handle_event"
     )
 
     return WorkerContext(
-        entrypoint_logger.container, Service, entrypoint, args=("bar",)
+        container, Service, entrypoint, args=("bar",)
     )
 
 
@@ -136,7 +134,7 @@ def test_setup(entrypoint_logger):
         if type(handler) == EntrypointLoggingHandler]
 
     assert EXCHANGE_NAME in str(entrypoint_logger.container.config)
-    assert EVENT_TYPE in str(entrypoint_logger.container.config)
+    assert ROUTING_KEY in str(entrypoint_logger.container.config)
 
 
 def test_will_not_process_request_from_unknown_entrypoints(
@@ -163,8 +161,8 @@ def test_requests_from_supported_workers_are_logged(
     with patch.object(entrypoint_logger, 'logger') as logger:
         with patch('nameko_entrypoint_logger.get_worker_data') as data:
             data.return_value = {'timestamp': datetime.utcnow()}
-            for worker in supported_workers:
-                entrypoint_logger.worker_setup(worker)
+            for worker_ctx in supported_workers:
+                entrypoint_logger.worker_setup(worker_ctx)
                 (call_args,), _ = logger.info.call_args
                 assert '"lifecycle_stage": "request"' in call_args
 
@@ -304,7 +302,7 @@ def test_entrypoint_logging_handler_will_dispatch_log_message():
 
 
 def test_event_dispatcher_will_dispatch_logs(config):
-    dispatcher = logging_dispatcher(config, EXCHANGE_NAME, EVENT_TYPE)
+    dispatcher = logging_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
 
     message = {'foo': 'bar'}
 
@@ -315,7 +313,7 @@ def test_event_dispatcher_will_dispatch_logs(config):
     (msg,), config = mock_producer.publish.call_args
 
     assert json.loads(msg) == message
-    assert config['routing_key'] == EVENT_TYPE
+    assert config['routing_key'] == ROUTING_KEY
 
 
 def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):

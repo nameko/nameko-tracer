@@ -10,118 +10,123 @@ Assuming service is configured to run with RabbitMQ.
 
 Add Entrypoint logging configuration to your nameko config file:
 
-.. code-block:: yaml
+```yaml
 
     # config.yaml
     ENTRYPOINT_LOGGING:
-		EXCHANGE_NAME: "monitoring"
-		EVENT_TYPE: "entry_point_log"
-	...
+        EXCHANGE_NAME: "monitoring"
+        ROUTING_KEY: "entrypoint_log"
+    ...
+```
 
 Include the `EntrypointLogger` dependency in your service class:
 
-.. code-block:: python
+```python
 
     # service.py
     from nameko.web.handlers import http
-    from nameko_sentry import SentryReporter
 
     class Service(object):
-        name = "demo"
+        name = "demo_service"
 
         entrypoint_logger = EntrypointLogger()
 
         @http('GET', '/get/<int:value>')
-    	def get_method(self, request, value):
+        def get_method(self, request, value):
             return json.dumps({'success': true})
+```
 
 Run your service, providing the config file:
 
-.. code-block:: shell
-
-    $ nameko run service --config config.yaml
+`$ nameko run service --config config.yaml`
 
 
-Each time `get_method` entrypoint is executed one `request` and one `response` messages will be published to `monitoring` exchange with `entry_point_log` routing key.
+Each time `get_method` entrypoint is executed one `request` and one `response` messages will be published to `monitoring` exchange with `entrypoint_log` routing key.
+
+`$ curl --header "X-MyHeader: 123" --user-agent "My User Agent String" http://localhost:8000/get/999`
 
 Sample Message: Lifecycle Stage: **request**
 
-.. code-block:: json
+```json
 
 {
     "lifecycle_stage": "request",
     "provider": "HttpRequestHandler",
-    "service": "service_a",
-    "provider_name": "post_method",
-    "entrypoint": "service_a.post_method",
+    "service": "demo_service",
+    "provider_name": "get_method",
+    "entrypoint": "demo_service.get_method",
+    "hostname": "BOB-MAC.lan",
+    "timestamp": "2015-11-26T10:15:02.022680",
     "call_stack": [
-        "service_a.post_method.e5288a58-b738-4a0a-8bfc-a6f8aec7564f"
-    ],    
+        "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4"
+    ],
+    "call_id": "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4",    
     "call_args": {
-        "url": "http://localhost:8000/post",
-        "method": "POST",
-        "env": {
-            "SERVER_PORT": "8000",
-            "SERVER_NAME": "127.0.0.1",
-            "REMOTE_ADDR": "127.0.0.1"
-        },
-        "headers": {
-            "Host": "localhost:8000",
-            "Content-Length": "109",
-            "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate",
-            "Content-Type": "application/json",
-            "Connection": "keep-alive",
-            "User-Agent": "python-requests/2.8.1"
-        },
-        "data": "{\"message\": \"test_json_request\", \"service_b_timestamp\": \"2015-11-16T18:19:01.845601\", \"type\": \"request type\"}"
-    },
-    "call_id": "service_a.post_method.e5288a58-b738-4a0a-8bfc-a6f8aec7564f",
-    "timestamp": "2015-11-16T18:19:01.861839",
-    "hostname": "JAKUBS-MAC.ldn.gb.oslcorp.lan"
+        "args": "{\"value\": \"999\"}",
+        "request": {
+            "env": {
+                "remote_addr": "127.0.0.1",
+                "server_port": "8000",
+                "server_name": "127.0.0.1"
+            },
+            "data": "{}",
+            "url": "http://localhost:8000/get/999",
+            "method": "GET",
+            "headers": {
+                "content_type": "text/plain",
+                "accept": "*/*",
+                "x_myheader": "123",
+                "host": "localhost:8000",
+                "user_agent": "My User Agent String"
+            }
+        }
+    }   
 }
+```
 
 Sample Message: Lifecycle Stage: **response**
 
-.. code-block:: json
+```json
 
 {
     "lifecycle_stage": "response",
     "provider": "HttpRequestHandler",
-    "service": "service_a",
-    "provider_name": "post_method",
-    "entrypoint": "service_a.post_method",
-    "call_stack": [
-        "service_a.post_method.e5288a58-b738-4a0a-8bfc-a6f8aec7564f"
-    ],
-    "call_args": {
-        "url": "http://localhost:8000/post",
-        "method": "POST",
-        "env": {
-            "SERVER_PORT": "8000",
-            "SERVER_NAME": "127.0.0.1",
-            "REMOTE_ADDR": "127.0.0.1"
-        },
-        "headers": {
-            "Host": "localhost:8000",
-            "Content-Length": "109",
-            "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate",
-            "Content-Type": "application/json",
-            "Connection": "keep-alive",
-            "User-Agent": "python-requests/2.8.1"
-        },
-        "data": "{\"message\": \"test_json_request\", \"service_b_timestamp\": \"2015-11-16T18:19:01.845601\", \"type\": \"request type\"}"
-    },
+    "service": "demo_service",
+    "provider_name": "get_method",
+    "entrypoint": "demo_service.get_method",    
+    "hostname": "BOB-MAC.lan",
+    "timestamp": "2015-11-26T10:15:02.026442",
     "status": "success",
-    "response_time": 0.002317,
-    "return_args": {
-    	"result": "{\"success\": true}",
-    	"content_type": "application/json",
-    	"status_code": 200,
-    	"result_bytes": 17
+    "response_time": 0.003762,
+    "call_stack": [
+        "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4"
+    ],
+    "call_id": "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4",
+    "call_args": {
+        "args": "{\"value\": \"999\"}",
+        "request": {
+            "env": {
+                "remote_addr": "127.0.0.1",
+                "server_port": "8000",
+                "server_name": "127.0.0.1"
+            },
+            "data": "{}",
+            "url": "http://localhost:8000/get/999",
+            "method": "GET",
+            "headers": {
+                "content_type": "text/plain",
+                "accept": "*/*",
+                "x_myheader": "123",
+                "host": "localhost:8000",
+                "user_agent": "My User Agent String"
+            }
+        }
     },
-    "call_id": "service_a.post_method.e5288a58-b738-4a0a-8bfc-a6f8aec7564f",
-    "timestamp": "2015-11-16T18:19:01.864156",
-    "hostname": "JAKUBS-MAC.ldn.gb.oslcorp.lan"
+    "return_args": {
+        "result_bytes": 14,
+        "content_type": "application/json",
+        "result": "{\"value\": 999}",
+        "status_code": 200
+    }
 }
+```
