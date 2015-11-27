@@ -21,6 +21,8 @@ from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
 from werkzeug.wrappers import Response
 
+log = logging.getLogger(__name__)
+
 
 class EntrypointLogger(DependencyProvider):
     """ Log arguments, results and debugging information
@@ -165,19 +167,23 @@ def logging_dispatcher(nameko_config, exchange_name, routing_key):
 
         exchange = Exchange(exchange_name)
 
-        with connections[conn].acquire(block=True) as connection:
-            exchange.maybe_bind(connection)
-            with producers[conn].acquire(block=True) as producer:
-                msg = event_data
-                producer.publish(
-                    msg,
-                    exchange=exchange,
-                    declare=[exchange],
-                    serializer=serializer,
-                    routing_key=routing_key,
-                    retry=True,
-                    retry_policy=DEFAULT_RETRY_POLICY
-                )
+        try:
+
+            with connections[conn].acquire(block=True) as connection:
+                exchange.maybe_bind(connection)
+                with producers[conn].acquire(block=True) as producer:
+                    msg = event_data
+                    producer.publish(
+                        msg,
+                        exchange=exchange,
+                        declare=[exchange],
+                        serializer=serializer,
+                        routing_key=routing_key,
+                        retry=True,
+                        retry_policy=DEFAULT_RETRY_POLICY
+                    )
+        except Exception as exc:
+            log.error(exc)
 
     return dispatch
 
