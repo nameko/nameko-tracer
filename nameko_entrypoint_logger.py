@@ -12,10 +12,9 @@ from nameko.constants import (
     DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
     SERIALIZER_CONFIG_KEY
 )
-from nameko.events import EventHandler
 from nameko.exceptions import safe_for_serialization, serialize
 from nameko.extensions import DependencyProvider
-from nameko.messaging import AMQP_URI_CONFIG_KEY
+from nameko.messaging import AMQP_URI_CONFIG_KEY, Consumer
 from nameko.rpc import Rpc
 from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
@@ -27,10 +26,11 @@ log = logging.getLogger(__name__)
 class EntrypointLogger(DependencyProvider):
     """ Log arguments, results and debugging information
     of service entrypoints to RabbitMQ. Supported entrypoints: Rpc,
-    EventHandler and HttpRequestHandler.
+    Consumer (and it's derived implementation EventHandler) and
+    HttpRequestHandler
     """
 
-    entrypoint_types = (Rpc, EventHandler, HttpRequestHandler)
+    entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
     def __init__(self, propagate=False):
         """Initialise EntrypointLogger.
@@ -182,7 +182,7 @@ def logging_dispatcher(nameko_config, exchange_name, routing_key):
                         retry=True,
                         retry_policy=DEFAULT_RETRY_POLICY
                     )
-        except Exception as exc:
+        except BrokenPipeError as exc:
             log.error(exc)
 
     return dispatch

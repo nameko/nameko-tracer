@@ -3,10 +3,12 @@ import logging
 import socket
 from datetime import datetime
 import pytest
+from kombu import Exchange, Queue
 from mock import ANY, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
+from nameko.messaging import consume, Consumer
 from nameko.rpc import Rpc, rpc
 from nameko.testing.services import entrypoint_hook, entrypoint_waiter
 from nameko.testing.utils import DummyProvider, get_extension
@@ -32,6 +34,7 @@ class Service(object):
     name = "service"
 
     entrypoint_logger = EntrypointLogger()
+    exchange = Exchange(EXCHANGE_NAME)
 
     @rpc(expected_exceptions=CustomException)
     def rpc_method(self, foo):
@@ -44,6 +47,13 @@ class Service(object):
 
     @event_handler("publisher", "property_updated")
     def handle_event(self, payload):
+        pass
+
+    @consume(
+        queue=Queue(
+            'service', exchange=exchange, routing_key=ROUTING_KEY
+        ))
+    def custom_handler(self, payload):
         pass
 
 
@@ -118,8 +128,23 @@ def event_worker_ctx(container):
 
 
 @pytest.fixture
-def supported_workers(rpc_worker_ctx, http_worker_ctx, event_worker_ctx):
-    return [rpc_worker_ctx, http_worker_ctx, event_worker_ctx]
+def consumer_worker_ctx(container):
+    entrypoint = get_extension(
+        container, Consumer, method_name="custom_handler"
+    )
+
+    return WorkerContext(
+        container, Service, entrypoint, args=({'foo': 'bar'},)
+    )
+
+
+@pytest.fixture
+def supported_workers(
+    rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx
+):
+    return [
+        rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx
+    ]
 
 
 @pytest.fixture
@@ -314,6 +339,18 @@ def test_event_dispatcher_will_dispatch_logs(config):
 
     assert json.loads(msg) == message
     assert config['routing_key'] == ROUTING_KEY
+
+
+def test_event_dispatcher_will_swallow_exception(config):
+    dispatcher = logging_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
+
+    with patch('nameko_entrypoint_logger.log') as log:
+        with patch('nameko_entrypoint_logger.producers') as producers:
+            with producers[ANY].acquire(block=True) as producer:
+                producer.publish.side_effect = BrokenPipeError(32, 'Oops')
+                dispatcher({})
+
+    assert log.error.called
 
 
 def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
