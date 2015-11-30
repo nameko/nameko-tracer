@@ -17,13 +17,13 @@ from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
-    get_worker_data, logging_dispatcher, process_response
+    get_worker_data, logging_publisher, process_response
 )
 
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_log"
 
-dispatcher = MagicMock()
+publisher = MagicMock()
 
 
 class CustomException(Exception):
@@ -63,7 +63,9 @@ def config():
         AMQP_URI_CONFIG_KEY: 'memory://',
         'ENTRYPOINT_LOGGING': {
             'EXCHANGE_NAME': EXCHANGE_NAME,
-            'ROUTING_KEY': ROUTING_KEY
+            'ROUTING_KEY': ROUTING_KEY,
+            'SERIALIZER': 'json',
+            'CONTENT_TYPE': 'application/json'
         }
     }
 
@@ -313,27 +315,27 @@ def test_can_get_http_call_args(data, serialized_data, content_type):
     assert request_call_args['headers']['content_type'] == content_type
 
 
-def test_entrypoint_logging_handler_will_dispatch_log_message():
+def test_entrypoint_logging_handler_will_publish_log_message():
     logger = logging.getLogger('test')
-    handler = EntrypointLoggingHandler(dispatcher)
+    handler = EntrypointLoggingHandler(publisher)
     logger.addHandler(handler)
     message = {'foo': 'bar'}
     logger.info(json.dumps(message))
 
-    (call_args,), _ = dispatcher.call_args
+    (call_args,), _ = publisher.call_args
 
-    assert dispatcher.called
+    assert publisher.called
     assert json.loads(call_args) == message
 
 
-def test_event_dispatcher_will_dispatch_logs(config):
-    dispatcher = logging_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
+def test_event_dispatcher_will_publish_logs(config):
+    publisher = logging_publisher(config, EXCHANGE_NAME, ROUTING_KEY)
 
     message = {'foo': 'bar'}
 
     with patch('nameko_entrypoint_logger.producers') as mock_producers:
         with mock_producers[ANY].acquire(block=True) as mock_producer:
-            dispatcher(json.dumps(message))
+            publisher(json.dumps(message))
 
     (msg,), config = mock_producer.publish.call_args
 
@@ -342,13 +344,13 @@ def test_event_dispatcher_will_dispatch_logs(config):
 
 
 def test_event_dispatcher_will_swallow_exception(config):
-    dispatcher = logging_dispatcher(config, EXCHANGE_NAME, ROUTING_KEY)
+    publisher = logging_publisher(config, EXCHANGE_NAME, ROUTING_KEY)
 
     with patch('nameko_entrypoint_logger.log') as log:
         with patch('nameko_entrypoint_logger.producers') as producers:
             with producers[ANY].acquire(block=True) as producer:
                 producer.publish.side_effect = BrokenPipeError(32, 'Oops')
-                dispatcher({})
+                publisher({})
 
     assert log.error.called
 

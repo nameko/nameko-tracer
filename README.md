@@ -16,6 +16,8 @@ Add Entrypoint logging configuration to your nameko config file:
     ENTRYPOINT_LOGGING:
         EXCHANGE_NAME: "monitoring"
         ROUTING_KEY: "entrypoint_log"
+        SERIALIZER: "json" # Optional. For example, json, raw, or pickle. Defaults to 'json'
+        CONTENT_TYPE: "application/json" # Optional. Can be set to any valid MIME type. Defaults to 'application/json'
     ...
 ```
 

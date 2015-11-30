@@ -9,8 +9,7 @@ import six
 from kombu import Connection, Exchange
 from kombu.pools import connections, producers
 from nameko.constants import (
-    DEFAULT_RETRY_POLICY, DEFAULT_SERIALIZER,
-    SERIALIZER_CONFIG_KEY
+    DEFAULT_RETRY_POLICY
 )
 from nameko.exceptions import safe_for_serialization, serialize
 from nameko.extensions import DependencyProvider
@@ -45,21 +44,21 @@ class EntrypointLogger(DependencyProvider):
 
     def setup(self):
 
-        entrypoint_config = self.container.config['ENTRYPOINT_LOGGING']
+        config = self.container.config['ENTRYPOINT_LOGGING']
 
-        exchange_name = entrypoint_config['EXCHANGE_NAME']
-        routing_key = entrypoint_config['ROUTING_KEY']
+        exchange_name = config['EXCHANGE_NAME']
+        routing_key = config['ROUTING_KEY']
 
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
         logger.propagate = self.propagate
 
-        dispatcher = logging_dispatcher(
-            self.container.config,
+        publisher = logging_publisher(
+            config,
             exchange_name,
             routing_key
         )
-        handler = EntrypointLoggingHandler(dispatcher)
+        handler = EntrypointLoggingHandler(publisher)
         formatter = logging.Formatter('%(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -118,12 +117,12 @@ class EntrypointLogger(DependencyProvider):
 
 
 class EntrypointLoggingHandler(logging.Handler):
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
+    def __init__(self, publisher):
+        self.publisher = publisher
         super(EntrypointLoggingHandler, self).__init__()
 
     def emit(self, message):
-        self.dispatcher(message.getMessage())
+        self.publisher(message.getMessage())
 
 
 def default(obj):
@@ -141,29 +140,32 @@ def dumps(obj):
     return json.dumps(obj, default=default)
 
 
-def logging_dispatcher(nameko_config, exchange_name, routing_key):
-    """ Return a function that dispatches nameko events.
+def logging_publisher(config, exchange_name, routing_key):
+    """ Return a function that publishes AMQP messages.
 
     :Parameters:
-        nameko_config: dict
-            Nameko configuration
+        config: dict
+            Entrypoint logger configuration
         exchange_name: str
-            Exchange where events should be published to
+            Exchange where messages should be published to
         routing_key: str
-            Event routing key
+            Message routing key
     """
 
-    def dispatch(event_data):
-        """ Dispatch an event
+    def publish(message_payload):
+        """ Publish message
 
         :Parameters:
-            event_data: dict
-                event payload
+            message_payload: dict
+                message payload
         """
-        conn = Connection(nameko_config[AMQP_URI_CONFIG_KEY])
+        conn = Connection(config[AMQP_URI_CONFIG_KEY])
 
-        serializer = nameko_config.get(
-            SERIALIZER_CONFIG_KEY, DEFAULT_SERIALIZER)
+        serializer = config.get(
+            'SERIALIZER', 'json')
+
+        content_type = config.get(
+            'CONTENT_TYPE', 'application/json')
 
         exchange = Exchange(exchange_name)
 
@@ -172,7 +174,7 @@ def logging_dispatcher(nameko_config, exchange_name, routing_key):
             with connections[conn].acquire(block=True) as connection:
                 exchange.maybe_bind(connection)
                 with producers[conn].acquire(block=True) as producer:
-                    msg = event_data
+                    msg = message_payload
                     producer.publish(
                         msg,
                         exchange=exchange,
@@ -180,12 +182,13 @@ def logging_dispatcher(nameko_config, exchange_name, routing_key):
                         serializer=serializer,
                         routing_key=routing_key,
                         retry=True,
-                        retry_policy=DEFAULT_RETRY_POLICY
+                        retry_policy=DEFAULT_RETRY_POLICY,
+                        content_type=content_type
                     )
         except BrokenPipeError as exc:
             log.error(exc)
 
-    return dispatch
+    return publish
 
 
 def get_worker_data(worker_ctx):
@@ -239,14 +242,12 @@ def get_worker_data(worker_ctx):
         })
     except Exception as exc:
         data.update({
-            'error': "Error when gathering worker data: {}".format(str(exc))
+            'error': "Error when gathering worker data: {}".format(exc)
         })
     return data
 
 
 def get_entrypoint_call_args(worker_ctx):
-    """Get arguments passed to worker container method)"""
-
     provider = worker_ctx.entrypoint
     method = getattr(provider.container.service_cls, provider.method_name)
 
@@ -321,7 +322,7 @@ def get_headers(environ):
     for key, value in six.iteritems(environ):
         key = str(key)
         if key.startswith('HTTP_') and key not in \
-            ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
+                ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
             yield key[5:].lower(), value
         elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
             yield key.lower(), value
