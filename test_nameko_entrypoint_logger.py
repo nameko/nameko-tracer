@@ -60,7 +60,7 @@ class Service(object):
 @pytest.fixture
 def config():
     return {
-        AMQP_URI_CONFIG_KEY: 'memory://',
+        AMQP_URI_CONFIG_KEY: 'memory://dev',
         'ENTRYPOINT_LOGGING': {
             'EXCHANGE_NAME': EXCHANGE_NAME,
             'ROUTING_KEY': ROUTING_KEY,
@@ -329,7 +329,12 @@ def test_entrypoint_logging_handler_will_publish_log_message():
 
 
 def test_event_dispatcher_will_publish_logs(config):
-    publisher = logging_publisher(config, EXCHANGE_NAME, ROUTING_KEY)
+
+    config = config.copy()
+    config['ENTRYPOINT_LOGGING']['SERIALIZER'] = 'raw'
+    config['ENTRYPOINT_LOGGING']['CONTENT_TYPE'] = 'binary'
+
+    publisher = logging_publisher(config)
 
     message = {'foo': 'bar'}
 
@@ -341,10 +346,16 @@ def test_event_dispatcher_will_publish_logs(config):
 
     assert json.loads(msg) == message
     assert config['routing_key'] == ROUTING_KEY
+    assert config['serializer'] == 'raw'
+    assert config['content_type'] == 'binary'
+    assert config['routing_key'] == ROUTING_KEY
+    client = config['exchange'].channel.connection.client
+    assert client.hostname == 'dev'
+    assert client.transport_cls == 'memory'
 
 
 def test_event_dispatcher_will_swallow_exception(config):
-    publisher = logging_publisher(config, EXCHANGE_NAME, ROUTING_KEY)
+    publisher = logging_publisher(config)
 
     with patch('nameko_entrypoint_logger.log') as log:
         with patch('nameko_entrypoint_logger.producers') as producers:

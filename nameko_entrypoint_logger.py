@@ -44,19 +44,12 @@ class EntrypointLogger(DependencyProvider):
 
     def setup(self):
 
-        config = self.container.config['ENTRYPOINT_LOGGING']
-
-        exchange_name = config['EXCHANGE_NAME']
-        routing_key = config['ROUTING_KEY']
-
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
         logger.propagate = self.propagate
 
         publisher = logging_publisher(
-            config,
-            exchange_name,
-            routing_key
+            self.container.config
         )
         handler = EntrypointLoggingHandler(publisher)
         formatter = logging.Formatter('%(message)s')
@@ -140,7 +133,7 @@ def dumps(obj):
     return json.dumps(obj, default=default)
 
 
-def logging_publisher(config, exchange_name, routing_key):
+def logging_publisher(config):
     """ Return a function that publishes AMQP messages.
 
     :Parameters:
@@ -161,10 +154,14 @@ def logging_publisher(config, exchange_name, routing_key):
         """
         conn = Connection(config[AMQP_URI_CONFIG_KEY])
 
-        serializer = config.get(
+        entrypoint_logging_config = config['ENTRYPOINT_LOGGING']
+        exchange_name = entrypoint_logging_config['EXCHANGE_NAME']
+        routing_key = entrypoint_logging_config['ROUTING_KEY']
+
+        serializer = entrypoint_logging_config.get(
             'SERIALIZER', 'json')
 
-        content_type = config.get(
+        content_type = entrypoint_logging_config.get(
             'CONTENT_TYPE', 'application/json')
 
         exchange = Exchange(exchange_name)
@@ -323,9 +320,9 @@ def get_headers(environ):
         key = str(key)
         if key.startswith('HTTP_') and key not in \
                 ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
-            yield key[5:].lower(), value
+            yield key[5:].lower(), str(value)
         elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
-            yield key.lower(), value
+            yield key.lower(), str(value)
 
 
 def get_environ(environ):
@@ -334,7 +331,7 @@ def get_environ(environ):
     """
     for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
         if key in environ:
-            yield key.lower(), environ[key]
+            yield key.lower(), str(environ[key])
 
 
 def to_string(value):
