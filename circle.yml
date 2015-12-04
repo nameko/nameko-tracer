@@ -1,0 +1,13 @@
+machine:
+  python:
+    version: 3.4.3
+
+dependencies:
+  pre:
+    - pip install -U pip wheel setuptools
+    - pip install ".[dev]"
+
+test:
+    override:
+      - coverage run --concurrency=eventlet --source nameko_entrypoint_logger.py -m pytest test_nameko_entrypoint_logger.py
+      - coverage html -d $CIRCLE_ARTIFACTS --fail-under 100
