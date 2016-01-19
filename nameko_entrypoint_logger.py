@@ -5,13 +5,13 @@ import socket
 from datetime import datetime
 from traceback import format_tb
 from weakref import WeakKeyDictionary
+
 import six
 from kombu import Connection, Exchange
 from kombu.pools import connections, producers
-from nameko.constants import (
-    DEFAULT_RETRY_POLICY
-)
-from nameko.exceptions import safe_for_serialization, serialize
+from nameko.constants import DEFAULT_RETRY_POLICY
+from nameko.exceptions import (
+    ConfigurationError, safe_for_serialization, serialize)
 from nameko.extensions import DependencyProvider
 from nameko.messaging import AMQP_URI_CONFIG_KEY, Consumer
 from nameko.rpc import Rpc
@@ -29,6 +29,12 @@ class EntrypointLogger(DependencyProvider):
     HttpRequestHandler
     """
 
+    required_config_keys = (
+        'AMQP_URI',
+        'EXCHANGE_NAME',
+        'ROUTING_KEY'
+    )
+
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
     def __init__(self, propagate=False):
@@ -43,6 +49,16 @@ class EntrypointLogger(DependencyProvider):
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
+
+        config = self.container.config.get('ENTRYPOINT_LOGGING')
+        if config is None:
+            raise ConfigurationError("Missing `ENTRYPOINT_LOGGING` config")
+
+        for key in self.required_config_keys:
+            if key not in config:
+                raise ConfigurationError(
+                    "ENTRYPOINT_LOGGING config missing key `{}`".format(key)
+                )
 
         logger = logging.getLogger('entrypoint_logger')
         logger.setLevel(logging.INFO)
@@ -152,9 +168,9 @@ def logging_publisher(config):
             message_payload: dict
                 message payload
         """
-        conn = Connection(config[AMQP_URI_CONFIG_KEY])
-
         entrypoint_logging_config = config['ENTRYPOINT_LOGGING']
+
+        amqp_uri = entrypoint_logging_config['AMQP_URI']
         exchange_name = entrypoint_logging_config['EXCHANGE_NAME']
         routing_key = entrypoint_logging_config['ROUTING_KEY']
 
@@ -164,6 +180,7 @@ def logging_publisher(config):
         content_type = entrypoint_logging_config.get(
             'CONTENT_TYPE', 'application/json')
 
+        conn = Connection(amqp_uri)
         exchange = Exchange(exchange_name)
 
         try:
@@ -182,7 +199,7 @@ def logging_publisher(config):
                         retry_policy=DEFAULT_RETRY_POLICY,
                         content_type=content_type
                     )
-        except BrokenPipeError as exc:
+        except Exception as exc:
             log.error(exc)
 
     return publish
