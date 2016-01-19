@@ -2,23 +2,24 @@ import json
 import logging
 import socket
 from datetime import datetime
+
 import pytest
 from kombu import Exchange, Queue
 from mock import ANY, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
-from nameko.messaging import consume, Consumer
+from nameko.exceptions import ConfigurationError
+from nameko.messaging import Consumer, consume
 from nameko.rpc import Rpc, rpc
 from nameko.testing.services import entrypoint_hook, entrypoint_waiter
 from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
-from werkzeug.test import create_environ
-from werkzeug.wrappers import Request, Response
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
-    get_worker_data, logging_publisher, process_response
-)
+    get_worker_data, logging_publisher, process_response)
+from werkzeug.test import create_environ
+from werkzeug.wrappers import Request, Response
 
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_log"
@@ -62,6 +63,7 @@ def config():
     return {
         AMQP_URI_CONFIG_KEY: 'memory://dev',
         'ENTRYPOINT_LOGGING': {
+            'AMQP_URI': 'memory://dev',
             'EXCHANGE_NAME': EXCHANGE_NAME,
             'ROUTING_KEY': ROUTING_KEY,
             'SERIALIZER': 'json',
@@ -162,6 +164,30 @@ def test_setup(entrypoint_logger):
 
     assert EXCHANGE_NAME in str(entrypoint_logger.container.config)
     assert ROUTING_KEY in str(entrypoint_logger.container.config)
+
+
+def test_missing_config(mock_container):
+    mock_container.config = {}
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+
+    with pytest.raises(ConfigurationError) as exc:
+        dependency_provider.setup()
+    assert str(exc.value) == "Missing `ENTRYPOINT_LOGGING` config"
+
+
+@pytest.mark.parametrize('required_key', [
+    'AMQP_URI',
+    'EXCHANGE_NAME',
+    'ROUTING_KEY',
+])
+def test_missing_config_key(required_key, config, mock_container):
+    del config['ENTRYPOINT_LOGGING'][required_key]
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+
+    with pytest.raises(ConfigurationError) as exc:
+        dependency_provider.setup()
+    assert "missing key `{}`".format(required_key) in str(exc.value)
 
 
 def test_will_not_process_request_from_unknown_entrypoints(
