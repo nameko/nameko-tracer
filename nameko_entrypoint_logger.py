@@ -13,7 +13,7 @@ from nameko.constants import DEFAULT_RETRY_POLICY
 from nameko.exceptions import (
     ConfigurationError, safe_for_serialization, serialize)
 from nameko.extensions import DependencyProvider
-from nameko.messaging import AMQP_URI_CONFIG_KEY, Consumer
+from nameko.messaging import Consumer
 from nameko.rpc import Rpc
 from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
