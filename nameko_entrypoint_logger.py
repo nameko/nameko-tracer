@@ -76,7 +76,7 @@ class EntrypointLogger(DependencyProvider):
 
     def worker_setup(self, worker_ctx):
 
-        if not isinstance(worker_ctx.entrypoint, self.entrypoint_types):
+        if not self.should_log(worker_ctx.entrypoint):
             return
 
         data = get_worker_data(worker_ctx)
@@ -91,7 +91,7 @@ class EntrypointLogger(DependencyProvider):
 
     def worker_result(self, worker_ctx, result=None, exc_info=None):
 
-        if not isinstance(worker_ctx.entrypoint, self.entrypoint_types):
+        if not self.should_log(worker_ctx.entrypoint):
             return
 
         data = get_worker_data(worker_ctx)
@@ -123,6 +123,9 @@ class EntrypointLogger(DependencyProvider):
         now = data['timestamp']
         worker_setup_time = self.worker_timestamps[worker_ctx]
         return (now - worker_setup_time).total_seconds()
+
+    def should_log(self, entrypoint):
+        return isinstance(entrypoint, self.entrypoint_types)
 
 
 class EntrypointLoggingHandler(logging.Handler):
