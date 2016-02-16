@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 from kombu import Exchange, Queue
-from mock import ANY, MagicMock, Mock, patch
+from mock import ANY, call, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
@@ -390,6 +390,30 @@ def test_event_dispatcher_will_swallow_exception(config):
                 publisher({})
 
     assert log.error.called
+
+
+def test_worker_setup_will_swallow_exceptions(
+        entrypoint_logger, http_worker_ctx
+):
+    exception = Exception("Boom")
+    with patch('nameko_entrypoint_logger.log') as log:
+        with patch('nameko_entrypoint_logger.get_worker_data') as data:
+            data.side_effect = exception
+            entrypoint_logger.worker_setup(http_worker_ctx)
+
+    assert [call(exception)] == log.error.call_args_list
+
+
+def test_worker_results_will_swallow_exceptions(
+        entrypoint_logger, http_worker_ctx
+):
+    exception = Exception("Boom")
+    with patch('nameko_entrypoint_logger.log') as log:
+        with patch('nameko_entrypoint_logger.get_worker_data') as data:
+            data.side_effect = exception
+            entrypoint_logger.worker_result(http_worker_ctx)
+
+    assert [call(exception)] == log.error.call_args_list
 
 
 def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
