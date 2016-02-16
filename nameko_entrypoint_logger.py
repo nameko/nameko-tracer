@@ -76,48 +76,58 @@ class EntrypointLogger(DependencyProvider):
 
     def worker_setup(self, worker_ctx):
 
-        if not self.should_log(worker_ctx.entrypoint):
-            return
+        try:
 
-        data = get_worker_data(worker_ctx)
+            if not self.should_log(worker_ctx.entrypoint):
+                return
 
-        data.update({
-            'lifecycle_stage': 'request'
-        })
+            data = get_worker_data(worker_ctx)
 
-        self.logger.info(dumps(data))
+            data.update({
+                'lifecycle_stage': 'request'
+            })
 
-        self.worker_timestamps[worker_ctx] = data['timestamp']
+            self.logger.info(dumps(data))
+
+            self.worker_timestamps[worker_ctx] = data['timestamp']
+
+        except Exception as exc:
+            log.error(exc)
 
     def worker_result(self, worker_ctx, result=None, exc_info=None):
 
-        if not self.should_log(worker_ctx.entrypoint):
-            return
+        try:
 
-        data = get_worker_data(worker_ctx)
+            if not self.should_log(worker_ctx.entrypoint):
+                return
 
-        response_time = self.calculate_response_time(data, worker_ctx)
+            data = get_worker_data(worker_ctx)
 
-        data.update({
-            'lifecycle_stage': 'response',
-            'response_time': response_time
-        })
+            response_time = self.calculate_response_time(data, worker_ctx)
 
-        if exc_info is None:
+            data.update({
+                'lifecycle_stage': 'response',
+                'response_time': response_time
+            })
 
-            data['status'] = 'success'
+            if exc_info is None:
 
-            data.update(
-                process_response(result)
-            )
-        else:
+                data['status'] = 'success'
 
-            data['status'] = 'error'
+                data.update(
+                    process_response(result)
+                )
+            else:
 
-            data.update(
-                process_exception(worker_ctx, exc_info)
-            )
-        self.logger.info(dumps(data))
+                data['status'] = 'error'
+
+                data.update(
+                    process_exception(worker_ctx, exc_info)
+                )
+            self.logger.info(dumps(data))
+
+        except Exception as exc:
+            log.error(exc)
 
     def calculate_response_time(self, data, worker_ctx):
         now = data['timestamp']
@@ -284,11 +294,12 @@ def process_response(result):
         data['return_args'] = get_http_response(result)
     else:
         result_string = to_string(safe_for_serialization(result))
-        result_bytes = len(result_string)
-        data['return_args'] = {
-            'result_bytes': result_bytes,
-            'result': result_string,
-        }
+        if result_string is not None:
+            result_bytes = len(result_string)
+            data['return_args'] = {
+                'result_bytes': result_bytes,
+                'result': result_string,
+            }
     return data
 
 
