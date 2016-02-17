@@ -316,10 +316,13 @@ def process_exception(worker_ctx, exc_info):
         exc_repr = "[exc serialization failed]"
 
     return {
-        'exc_type': exc_info[0].__name__,
-        'exc': exc_repr,
-        'traceback': ''.join(format_tb(exc_info[2])),
-        'expected_error': is_expected,
+        'exception': {
+            'exc_type': exc_info[0].__name__,
+            'exc': to_string(exc_repr),
+            'traceback': ''.join(format_tb(exc_info[2])),
+            'expected_error': is_expected,
+        }
+
     }
 
 

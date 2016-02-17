@@ -432,9 +432,9 @@ def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['expected_error'] == False
+    assert worker_data['exception']['expected_error'] == False
     assert worker_data['status'] == 'error'
-    assert "Something went wrong" in str(worker_data['exc'])
+    assert "Something went wrong" in str(worker_data['exception']['exc'])
 
 
 def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
@@ -453,9 +453,9 @@ def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['expected_error'] == True
+    assert worker_data['exception']['expected_error'] == True
     assert worker_data['status'] == 'error'
-    assert "Invalid value" in str(worker_data['exc'])
+    assert "Invalid value" in str(worker_data['exception']['exc'])
 
 
 def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
@@ -474,7 +474,7 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
 
     worker_data = json.loads(call_args)
 
-    assert worker_data['exc'] == '[exc serialization failed]'
+    assert worker_data['exception']['exc'] == '[exc serialization failed]'
 
 
 def test_end_to_end(container_factory, config):
