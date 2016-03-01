@@ -170,9 +170,11 @@ def test_missing_config(mock_container):
     mock_container.config = {}
     dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
 
-    with pytest.raises(ConfigurationError) as exc:
+    with patch('nameko_entrypoint_logger.log') as log:
         dependency_provider.setup()
-    assert str(exc.value) == "Missing `ENTRYPOINT_LOGGING` config"
+
+    calls = [call('EntrypointLogger is disabled')]
+    assert calls == log.warning.call_args_list
 
 
 @pytest.mark.parametrize('required_key', [
@@ -202,6 +204,26 @@ def test_will_not_process_request_from_unknown_entrypoints(
 def test_will_not_process_results_from_unknown_entrypoints(
     entrypoint_logger, dummy_worker_ctx
 ):
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(dummy_worker_ctx)
+
+    assert not logger.info.called
+
+
+def test_will_not_process_request_without_config(
+    entrypoint_logger, dummy_worker_ctx
+):
+    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_setup(dummy_worker_ctx)
+
+    assert not logger.info.called
+
+
+def test_will_not_process_results_without_config(
+    entrypoint_logger, dummy_worker_ctx
+):
+    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
     with patch.object(entrypoint_logger, 'logger') as logger:
         entrypoint_logger.worker_result(dummy_worker_ctx)
 

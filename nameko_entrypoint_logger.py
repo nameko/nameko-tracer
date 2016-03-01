@@ -52,7 +52,8 @@ class EntrypointLogger(DependencyProvider):
 
         config = self.container.config.get('ENTRYPOINT_LOGGING')
         if config is None:
-            raise ConfigurationError("Missing `ENTRYPOINT_LOGGING` config")
+            log.warning('EntrypointLogger is disabled')
+            return
 
         for key in self.required_config_keys:
             if key not in config:
@@ -135,7 +136,8 @@ class EntrypointLogger(DependencyProvider):
         return (now - worker_setup_time).total_seconds()
 
     def should_log(self, entrypoint):
-        return isinstance(entrypoint, self.entrypoint_types)
+        config = self.container.config.get('ENTRYPOINT_LOGGING')
+        return config and isinstance(entrypoint, self.entrypoint_types)
 
 
 class EntrypointLoggingHandler(logging.Handler):
