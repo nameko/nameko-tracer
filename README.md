@@ -14,6 +14,7 @@ Add Entrypoint logging configuration to your nameko config file:
 
     # config.yaml
     ENTRYPOINT_LOGGING:
+        ENABLED: True  # mandatory, disables the logger if not set or missing
         EXCHANGE_NAME: "monitoring"
         ROUTING_KEY: "entrypoint_log"
         SERIALIZER: "json" # Optional. For example, json, raw, or pickle. Defaults to 'json'

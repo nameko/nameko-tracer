@@ -46,12 +46,15 @@ class EntrypointLogger(DependencyProvider):
         """
         self.propagate = propagate
         self.logger = None
+        self.enabled = False
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
 
         config = self.container.config.get('ENTRYPOINT_LOGGING')
-        if config is None:
+        if config and config.get('ENABLED'):
+            self.enabled = True
+        else:
             log.warning('EntrypointLogger is disabled')
             return
 
@@ -136,8 +139,7 @@ class EntrypointLogger(DependencyProvider):
         return (now - worker_setup_time).total_seconds()
 
     def should_log(self, entrypoint):
-        config = self.container.config.get('ENTRYPOINT_LOGGING')
-        return config and isinstance(entrypoint, self.entrypoint_types)
+        return self.enabled and isinstance(entrypoint, self.entrypoint_types)
 
 
 class EntrypointLoggingHandler(logging.Handler):
