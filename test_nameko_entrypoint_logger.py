@@ -239,22 +239,22 @@ def test_will_not_process_results_from_unknown_entrypoints(
     assert not logger.info.called
 
 
-def test_will_not_process_request_without_config(
-    entrypoint_logger, dummy_worker_ctx
+def test_will_not_process_request_if_disabled(
+    entrypoint_logger, rpc_worker_ctx
 ):
-    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_setup(dummy_worker_ctx)
+    with patch.object(entrypoint_logger, 'enabled', False):
+        with patch.object(entrypoint_logger, 'logger') as logger:
+            entrypoint_logger.worker_setup(rpc_worker_ctx)
 
     assert not logger.info.called
 
 
-def test_will_not_process_results_without_config(
-    entrypoint_logger, dummy_worker_ctx
+def test_will_not_process_results_if_disabled(
+    entrypoint_logger, rpc_worker_ctx
 ):
-    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(dummy_worker_ctx)
+    with patch.object(entrypoint_logger, 'enabled', False):
+        with patch.object(entrypoint_logger, 'logger') as logger:
+            entrypoint_logger.worker_result(rpc_worker_ctx)
 
     assert not logger.info.called
 
