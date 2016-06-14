@@ -63,6 +63,7 @@ def config():
     return {
         AMQP_URI_CONFIG_KEY: 'memory://dev',
         'ENTRYPOINT_LOGGING': {
+            'ENABLED': True,
             'AMQP_URI': 'memory://dev',
             'EXCHANGE_NAME': EXCHANGE_NAME,
             'ROUTING_KEY': ROUTING_KEY,
@@ -175,6 +176,33 @@ def test_missing_config(mock_container):
 
     calls = [call('EntrypointLogger is disabled')]
     assert calls == log.warning.call_args_list
+    assert dependency_provider.logger is None
+
+
+def test_disabled_by_config(mock_container, config):
+    del config['ENTRYPOINT_LOGGING']['ENABLED']
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+
+    with patch('nameko_entrypoint_logger.log') as log:
+        dependency_provider.setup()
+
+    calls = [call('EntrypointLogger is disabled')]
+    assert calls == log.warning.call_args_list
+    assert dependency_provider.logger is None
+
+
+def test_disabled_by_config_explicitly(mock_container, config):
+    config['ENTRYPOINT_LOGGING']['ENABLED'] = False
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+
+    with patch('nameko_entrypoint_logger.log') as log:
+        dependency_provider.setup()
+
+    calls = [call('EntrypointLogger is disabled')]
+    assert calls == log.warning.call_args_list
+    assert dependency_provider.logger is None
 
 
 @pytest.mark.parametrize('required_key', [
@@ -190,6 +218,7 @@ def test_missing_config_key(required_key, config, mock_container):
     with pytest.raises(ConfigurationError) as exc:
         dependency_provider.setup()
     assert "missing key `{}`".format(required_key) in str(exc.value)
+    assert dependency_provider.logger is None
 
 
 def test_will_not_process_request_from_unknown_entrypoints(
@@ -210,22 +239,22 @@ def test_will_not_process_results_from_unknown_entrypoints(
     assert not logger.info.called
 
 
-def test_will_not_process_request_without_config(
-    entrypoint_logger, dummy_worker_ctx
+def test_will_not_process_request_if_disabled(
+    entrypoint_logger, rpc_worker_ctx
 ):
-    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_setup(dummy_worker_ctx)
+    with patch.object(entrypoint_logger, 'enabled', False):
+        with patch.object(entrypoint_logger, 'logger') as logger:
+            entrypoint_logger.worker_setup(rpc_worker_ctx)
 
     assert not logger.info.called
 
 
-def test_will_not_process_results_without_config(
-    entrypoint_logger, dummy_worker_ctx
+def test_will_not_process_results_if_disabled(
+    entrypoint_logger, rpc_worker_ctx
 ):
-    del entrypoint_logger.container.config['ENTRYPOINT_LOGGING']
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(dummy_worker_ctx)
+    with patch.object(entrypoint_logger, 'enabled', False):
+        with patch.object(entrypoint_logger, 'logger') as logger:
+            entrypoint_logger.worker_result(rpc_worker_ctx)
 
     assert not logger.info.called
 
