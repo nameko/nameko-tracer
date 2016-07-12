@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='nameko-entrypoint-logger',
-    version='0.0.7',
+    version='0.0.8',
     description='Nameko extension sends entrypoint monitoring events to AMPQ',
     packages=find_packages(exclude=['test', 'test.*']),
     author='student.com',
@@ -15,9 +15,9 @@ setup(
     ],
     extras_require={
         'dev': [
-            "coverage==4.0a1",
-            "pytest==2.8.2",
-            "isort==4.0.0"
+            "coverage==4.1.0",
+            "pytest==2.9.2",
+            "isort==4.2.5",
         ]
     },
     dependency_links=[],

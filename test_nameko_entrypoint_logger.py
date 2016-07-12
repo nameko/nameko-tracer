@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import socket
 from datetime import datetime
 
@@ -17,7 +18,8 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
-    get_worker_data, logging_publisher, process_response)
+    get_worker_data, logging_publisher, process_response,
+    compile_truncation_config, should_truncate)
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
@@ -372,6 +374,12 @@ def test_can_process_results(
         assert return_args['content_type'] == content_type
 
 
+def test_can_process_results_truncated():
+    response = process_response({'foo': 'bar'}, max_response_length=5)
+    assert response['return_args']['result_bytes'] == 14
+    assert response['return_args']['result'] == '{"foo'
+
+
 @pytest.mark.parametrize('data,serialized_data,content_type', [
     (json.dumps({'foo': 'bar'}), '{"foo": "bar"}', 'application/json'),
     ('foo=bar', '{"foo": "bar"}', 'application/x-www-form-urlencoded'),
@@ -483,7 +491,7 @@ def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['exception']['expected_error'] == False
+    assert worker_data['exception']['expected_error'] is False
     assert worker_data['status'] == 'error'
     assert "Something went wrong" in str(worker_data['exception']['exc'])
 
@@ -504,7 +512,7 @@ def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['exception']['expected_error'] == True
+    assert worker_data['exception']['expected_error'] is True
     assert worker_data['status'] == 'error'
     assert "Invalid value" in str(worker_data['exception']['exc'])
 
@@ -551,6 +559,128 @@ def test_end_to_end(container_factory, config):
     assert logger.info.call_count == 2
 
 
+def test_end_to_end_default_response_truncation(container_factory, config):
+    class TestService(object):
+        name = "service"
+
+        entrypoint_logger = EntrypointLogger()
+
+        @rpc
+        def rpc_method(self):
+            return 'A' * 200
+
+        @rpc
+        def get_rpc(self):
+            return 'B' * 200
+
+        @rpc
+        def list_rpc(self):
+            return 'C' * 200
+
+        @rpc
+        def query_rpc(self):
+            return {'my_result': 'D' * 200}
+
+    container = container_factory(TestService, config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        # invoke all the service methods
+        for meth_name in ['rpc_method', 'get_rpc', 'list_rpc', 'query_rpc']:
+            with entrypoint_hook(container, meth_name) as rpc_meth:
+                with entrypoint_waiter(container, meth_name):
+                    rpc_meth()
+
+    def get_response_dict_from_log_call(log_call):
+        return json.loads(log_call[0][0])
+
+    assert logger.info.call_count == 8
+    rpc_method_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[1])
+    assert rpc_method_response['entrypoint'] == 'service.rpc_method'
+    assert rpc_method_response['return_args']['result_bytes'] == 200
+    assert rpc_method_response['return_args']['result'] == 'A' * 200
+
+    get_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[3])
+    assert get_rpc_response['entrypoint'] == 'service.get_rpc'
+    assert get_rpc_response['return_args']['result_bytes'] == 200
+    assert get_rpc_response['return_args']['result'] == 'B' * 100
+
+    list_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[5])
+    assert list_rpc_response['entrypoint'] == 'service.list_rpc'
+    assert list_rpc_response['return_args']['result_bytes'] == 200
+    assert list_rpc_response['return_args']['result'] == 'C' * 100
+
+    query_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[7])
+    assert query_rpc_response['entrypoint'] == 'service.query_rpc'
+    assert query_rpc_response['return_args']['result_bytes'] == 217
+    assert query_rpc_response['return_args']['result'] == (
+        '{"my_result": "%s' % ('D' * 85)
+    )
+
+
+def test_end_to_end_custom_response_truncation(container_factory, config):
+    class TestService(object):
+        name = "service"
+
+        # configure an entrypoint logger such that all methods are truncated
+        # except `get_rpc2` and `get_rpc3`
+        entrypoint_logger = EntrypointLogger(
+            response_truncation_config={'whitelist': ['get_rpc2', 'get_rpc3']}
+        )
+
+        @rpc
+        def get_rpc1(self):
+            return 'A' * 200
+
+        @rpc
+        def get_rpc2(self):
+            return 'B' * 200
+
+        @rpc
+        def get_rpc3(self):
+            return 'C' * 200
+
+    container = container_factory(TestService, config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        # invoke all the service methods
+        for meth_name in ['get_rpc1', 'get_rpc2', 'get_rpc3']:
+            with entrypoint_hook(container, meth_name) as rpc_meth:
+                with entrypoint_waiter(container, meth_name):
+                    rpc_meth()
+
+    def get_response_dict_from_log_call(log_call):
+        return json.loads(log_call[0][0])
+
+    assert logger.info.call_count == 6
+    get_rpc1_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[1])
+    assert get_rpc1_response['entrypoint'] == 'service.get_rpc1'
+    assert get_rpc1_response['return_args']['result_bytes'] == 200
+    assert get_rpc1_response['return_args']['result'] == 'A' * 100
+
+    get_rpc2_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[3])
+    assert get_rpc2_response['entrypoint'] == 'service.get_rpc2'
+    assert get_rpc2_response['return_args']['result_bytes'] == 200
+    assert get_rpc2_response['return_args']['result'] == 'B' * 200
+
+    get_rpc3_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[5])
+    assert get_rpc3_response['entrypoint'] == 'service.get_rpc3'
+    assert get_rpc3_response['return_args']['result_bytes'] == 200
+    assert get_rpc3_response['return_args']['result'] == 'C' * 200
+
+
 def test_default_json_serializer_will_raise_value_error():
     with pytest.raises(ValueError):
         dumps({'weird_value': {None}})
@@ -564,3 +694,63 @@ def test_can_handle_exception_when_getting_worker_data():
         data = get_worker_data(worker_ctx)
 
     assert error_message in data['error']
+
+
+@pytest.mark.parametrize(
+    ('cfg', 'expected_result'), [
+        ({}, {}),
+        (None, {}),
+        ({'foo': 'bar'}, {}),
+        ({'whitelist': None}, {}),
+        ({'whitelist': []}, {}),
+        ({'blacklist': None}, {}),
+        ({'blacklist': []}, {}),
+        ({'whitelist': [], 'blacklist': []}, {}),
+        ({'whitelist': None, 'blacklist': None}, {}),
+        ({'whitelist': ['a']}, {'whitelist': [re.compile('a')]}),
+        ({'whitelist': ['a', 'b']},
+            {'whitelist': [re.compile('a'), re.compile('b')]}),
+        ({'whitelist': ['a'], 'blacklist': []},
+            {'whitelist': [re.compile('a')]}),
+        ({'blacklist': ['a']}, {'blacklist': [re.compile('a')]}),
+        ({'blacklist': ['a', 'b']},
+            {'blacklist': [re.compile('a'), re.compile('b')]}),
+        ({'whitelist': [], 'blacklist': ['a']},
+            {'blacklist': [re.compile('a')]}),
+        ({'whitelist': [], 'blacklist': ['a'], 'foo': 1, 'ignore': 'this'},
+            {'blacklist': [re.compile('a')]}),
+    ]
+)
+def test_compile_truncation_config(cfg, expected_result):
+    result = compile_truncation_config(cfg)
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    ('cfg', 'expected_err', 'expected_msg'), [
+        ({'whitelist': ['a'], 'blacklist':['b']}, ValueError, 'not have both'),
+        ({'whitelist': [1]}, TypeError, 'must be string'),
+    ]
+)
+def test_compile_truncation_config_error(cfg, expected_err, expected_msg):
+    with pytest.raises(expected_err) as exc:
+        compile_truncation_config(cfg)
+    assert expected_msg in str(exc)
+
+
+@pytest.mark.parametrize(
+    ('blacklist', 'whitelist', 'expected'), [
+        (None, None, False),
+        ([re.compile('foo')], None, False),
+        ([re.compile('foo'), re.compile('rpc_method')], None, True),
+        ([re.compile('rpc_method'), re.compile('foo')], None, True),
+        (None, [re.compile('foo')], True),
+        (None, [re.compile('foo'), re.compile('rpc_method')], False),
+        (None, [re.compile('rpc_method'), re.compile('foo')], False),
+    ]
+)
+def test_should_truncate(rpc_worker_ctx, blacklist, whitelist, expected):
+    result = should_truncate(
+        rpc_worker_ctx, blacklist=blacklist, whitelist=whitelist
+    )
+    assert result == expected

@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import re
 import socket
 from datetime import datetime
 from traceback import format_tb
@@ -35,19 +36,52 @@ class EntrypointLogger(DependencyProvider):
         'ROUTING_KEY'
     )
 
+    default_response_truncation_config = {
+        'blacklist': ['^get_|^list_|^query_'],
+    }
+    truncated_response_length = 100
+
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
-    def __init__(self, propagate=False):
+    def __init__(
+        self,
+        propagate=False,
+        response_truncation_config=None,
+    ):
         """Initialise EntrypointLogger.
 
         :Parameters:
             propagate: bool
                 Enable logs propagation to the handlers of higher level.
+
+            response_truncation_config: dict
+                Configures how response data is truncated.
+                Should be a dict containing either a ``"whitelist"`` or
+                ``"blacklist"`` key, and a list of regex strings that can
+                be used to match entrypoint names.
+                A ``blacklist`` or a ``whitelist`` can be used, but not both.
+
+                -  If a ``blacklist`` is given, then only the matching
+                   entrypoints will have their responses truncated. Any other
+                   entrypoints will be logged in full.
+
+                -  If a ``whitelist`` is given, then all entrypoint responses
+                   will be truncated, except for those that match.
+
+                -  If no config is given, a default blacklist is used
         """
         self.propagate = propagate
         self.logger = None
         self.enabled = False
         self.worker_timestamps = WeakKeyDictionary()
+
+        if response_truncation_config is None:
+            response_truncation_config = (
+                self.default_response_truncation_config)
+
+        self.response_truncation_config = compile_truncation_config(
+            response_truncation_config
+        )
 
     def setup(self):
 
@@ -115,11 +149,18 @@ class EntrypointLogger(DependencyProvider):
             })
 
             if exc_info is None:
+                max_response_length = None
+                if should_truncate(
+                    worker_ctx, **self.response_truncation_config
+                ):
+                    max_response_length = self.truncated_response_length
 
                 data['status'] = 'success'
 
                 data.update(
-                    process_response(result)
+                    process_response(
+                        result, max_response_length=max_response_length
+                    )
                 )
             else:
 
@@ -291,7 +332,7 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def process_response(result):
+def process_response(result, max_response_length=None):
     data = {}
 
     if isinstance(result, Response):
@@ -300,6 +341,8 @@ def process_response(result):
         result_string = to_string(safe_for_serialization(result))
         if result_string is not None:
             result_bytes = len(result_string)
+            if max_response_length is not None:
+                result_string = result_string[:max_response_length]
             data['return_args'] = {
                 'result_bytes': result_bytes,
                 'result': result_string,
@@ -379,3 +422,32 @@ def to_string(value):
         return json.dumps(value)
     if isinstance(value, bytes):
         return value.decode("utf-8")
+
+
+def compile_truncation_config(truncation_cfg):
+    truncation_cfg = truncation_cfg or {}
+    if truncation_cfg.get('blacklist') and truncation_cfg.get('whitelist'):
+        raise ValueError(
+            "trucation_config cannot have both whitelist and blacklist"
+        )
+    return {
+        list_type: [re.compile(r) for r in re_list]
+        for list_type, re_list in truncation_cfg.items()
+        if re_list and list_type in {'blacklist', 'whitelist'}
+    }
+
+
+def should_truncate(worker_ctx, blacklist=None, whitelist=None):
+    provider = worker_ctx.entrypoint
+    provider_name = provider.method_name
+    if blacklist:
+        for regex in blacklist:
+            if regex.match(provider_name):
+                return True
+        return False
+    elif whitelist:
+        for regex in whitelist:
+            if regex.match(provider_name):
+                return False
+        return True
+    return False
