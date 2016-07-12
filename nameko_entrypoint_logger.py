@@ -41,11 +41,7 @@ class EntrypointLogger(DependencyProvider):
 
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
-    def __init__(
-        self,
-        propagate=False,
-        response_truncation_config=None,
-    ):
+    def __init__(self, propagate=False):
         """Initialise EntrypointLogger.
 
         :Parameters:
