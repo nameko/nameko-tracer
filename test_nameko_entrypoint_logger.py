@@ -18,8 +18,7 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
-    get_worker_data, logging_publisher, process_response,
-    compile_truncation_config, should_truncate)
+    get_worker_data, logging_publisher, process_response, should_truncate)
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
@@ -628,11 +627,7 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     class TestService(object):
         name = "service"
 
-        # configure an entrypoint logger such that all methods are truncated
-        # except `get_rpc2` and `get_rpc3`
-        entrypoint_logger = EntrypointLogger(
-            response_truncation_config={'whitelist': ['get_rpc2', 'get_rpc3']}
-        )
+        entrypoint_logger = EntrypointLogger()
 
         @rpc
         def get_rpc1(self):
@@ -646,7 +641,13 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
         def get_rpc3(self):
             return 'C' * 200
 
-    container = container_factory(TestService, config)
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_RESPONSE_ENTRYPOINTS'] = [
+        'get_rpc1', 'get_rpc3'
+    ]
+
+    container = container_factory(TestService, custom_config)
     container.start()
 
     logger = get_extension(container, EntrypointLogger)
@@ -678,7 +679,7 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
         logger.info.call_args_list[5])
     assert get_rpc3_response['entrypoint'] == 'service.get_rpc3'
     assert get_rpc3_response['return_args']['result_bytes'] == 200
-    assert get_rpc3_response['return_args']['result'] == 'C' * 200
+    assert get_rpc3_response['return_args']['result'] == 'C' * 100
 
 
 def test_default_json_serializer_will_raise_value_error():
@@ -697,60 +698,13 @@ def test_can_handle_exception_when_getting_worker_data():
 
 
 @pytest.mark.parametrize(
-    ('cfg', 'expected_result'), [
-        ({}, {}),
-        (None, {}),
-        ({'foo': 'bar'}, {}),
-        ({'whitelist': None}, {}),
-        ({'whitelist': []}, {}),
-        ({'blacklist': None}, {}),
-        ({'blacklist': []}, {}),
-        ({'whitelist': [], 'blacklist': []}, {}),
-        ({'whitelist': None, 'blacklist': None}, {}),
-        ({'whitelist': ['a']}, {'whitelist': [re.compile('a')]}),
-        ({'whitelist': ['a', 'b']},
-            {'whitelist': [re.compile('a'), re.compile('b')]}),
-        ({'whitelist': ['a'], 'blacklist': []},
-            {'whitelist': [re.compile('a')]}),
-        ({'blacklist': ['a']}, {'blacklist': [re.compile('a')]}),
-        ({'blacklist': ['a', 'b']},
-            {'blacklist': [re.compile('a'), re.compile('b')]}),
-        ({'whitelist': [], 'blacklist': ['a']},
-            {'blacklist': [re.compile('a')]}),
-        ({'whitelist': [], 'blacklist': ['a'], 'foo': 1, 'ignore': 'this'},
-            {'blacklist': [re.compile('a')]}),
+    ('truncated_entrypoints', 'expected'), [
+        (None, False),
+        ([re.compile('foo')], False),
+        ([re.compile('foo'), re.compile('rpc_method')], True),
+        ([re.compile('rpc_method'), re.compile('foo')], True),
     ]
 )
-def test_compile_truncation_config(cfg, expected_result):
-    result = compile_truncation_config(cfg)
-    assert result == expected_result
-
-
-@pytest.mark.parametrize(
-    ('cfg', 'expected_err', 'expected_msg'), [
-        ({'whitelist': ['a'], 'blacklist':['b']}, ValueError, 'not have both'),
-        ({'whitelist': [1]}, TypeError, 'must be string'),
-    ]
-)
-def test_compile_truncation_config_error(cfg, expected_err, expected_msg):
-    with pytest.raises(expected_err) as exc:
-        compile_truncation_config(cfg)
-    assert expected_msg in str(exc)
-
-
-@pytest.mark.parametrize(
-    ('blacklist', 'whitelist', 'expected'), [
-        (None, None, False),
-        ([re.compile('foo')], None, False),
-        ([re.compile('foo'), re.compile('rpc_method')], None, True),
-        ([re.compile('rpc_method'), re.compile('foo')], None, True),
-        (None, [re.compile('foo')], True),
-        (None, [re.compile('foo'), re.compile('rpc_method')], False),
-        (None, [re.compile('rpc_method'), re.compile('foo')], False),
-    ]
-)
-def test_should_truncate(rpc_worker_ctx, blacklist, whitelist, expected):
-    result = should_truncate(
-        rpc_worker_ctx, blacklist=blacklist, whitelist=whitelist
-    )
+def test_should_truncate(rpc_worker_ctx, truncated_entrypoints, expected):
+    result = should_truncate(rpc_worker_ctx, truncated_entrypoints)
     assert result == expected
