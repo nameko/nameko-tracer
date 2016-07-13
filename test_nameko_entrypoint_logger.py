@@ -367,6 +367,7 @@ def test_can_process_results(
     return_args = response['return_args']
     assert return_args['result'] == result_serialized
     assert return_args['result_bytes'] == result_bytes
+    assert return_args['truncated'] is False
     if status_code is not None:
         assert return_args['status_code'] == status_code
     if content_type is not None:
@@ -383,6 +384,7 @@ def test_can_process_results_truncated(result):
     response = process_response(result, max_response_length=5)
     assert response['return_args']['result_bytes'] == 14
     assert response['return_args']['result'] == '{"foo'
+    assert response['return_args']['truncated'] is True
 
 
 @pytest.mark.parametrize('data,serialized_data,content_type', [
@@ -607,18 +609,21 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     assert rpc_method_response['entrypoint'] == 'service.rpc_method'
     assert rpc_method_response['return_args']['result_bytes'] == 200
     assert rpc_method_response['return_args']['result'] == 'A' * 200
+    assert rpc_method_response['return_args']['truncated'] is False
 
     get_rpc_response = get_response_dict_from_log_call(
         logger.info.call_args_list[3])
     assert get_rpc_response['entrypoint'] == 'service.get_rpc'
     assert get_rpc_response['return_args']['result_bytes'] == 200
     assert get_rpc_response['return_args']['result'] == 'B' * 100
+    assert get_rpc_response['return_args']['truncated'] is True
 
     list_rpc_response = get_response_dict_from_log_call(
         logger.info.call_args_list[5])
     assert list_rpc_response['entrypoint'] == 'service.list_rpc'
     assert list_rpc_response['return_args']['result_bytes'] == 200
     assert list_rpc_response['return_args']['result'] == 'C' * 100
+    assert list_rpc_response['return_args']['truncated'] is True
 
     query_rpc_response = get_response_dict_from_log_call(
         logger.info.call_args_list[7])
@@ -627,6 +632,7 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     assert query_rpc_response['return_args']['result'] == (
         '{"my_result": "%s' % ('D' * 85)
     )
+    assert query_rpc_response['return_args']['truncated'] is True
 
 
 def test_end_to_end_custom_response_truncation(container_factory, config):
@@ -674,18 +680,21 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc1_response['entrypoint'] == 'service.get_rpc1'
     assert get_rpc1_response['return_args']['result_bytes'] == 200
     assert get_rpc1_response['return_args']['result'] == 'A' * 100
+    assert get_rpc1_response['return_args']['truncated'] is True
 
     get_rpc2_response = get_response_dict_from_log_call(
         logger.info.call_args_list[3])
     assert get_rpc2_response['entrypoint'] == 'service.get_rpc2'
     assert get_rpc2_response['return_args']['result_bytes'] == 200
     assert get_rpc2_response['return_args']['result'] == 'B' * 200
+    assert get_rpc2_response['return_args']['truncated'] is False
 
     get_rpc3_response = get_response_dict_from_log_call(
         logger.info.call_args_list[5])
     assert get_rpc3_response['entrypoint'] == 'service.get_rpc3'
     assert get_rpc3_response['return_args']['result_bytes'] == 200
     assert get_rpc3_response['return_args']['result'] == 'C' * 100
+    assert get_rpc3_response['return_args']['truncated'] is True
 
 
 @pytest.mark.parametrize(

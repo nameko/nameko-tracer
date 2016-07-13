@@ -317,6 +317,9 @@ def truncate_response(return_args, max_response_length):
             len(return_args['result']) > max_response_length
         ):
             return_args['result'] = return_args['result'][:max_response_length]
+            return_args['truncated'] = True
+        else:
+            return_args['truncated'] = False
 
 
 def process_response(result, max_response_length=None):
