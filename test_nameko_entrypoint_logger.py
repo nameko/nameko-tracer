@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import socket
 from datetime import datetime
 
@@ -17,7 +18,7 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import (
     EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
-    get_worker_data, logging_publisher, process_response)
+    get_worker_data, logging_publisher, process_response, should_truncate)
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
@@ -366,10 +367,24 @@ def test_can_process_results(
     return_args = response['return_args']
     assert return_args['result'] == result_serialized
     assert return_args['result_bytes'] == result_bytes
+    assert return_args['truncated'] is False
     if status_code is not None:
         assert return_args['status_code'] == status_code
     if content_type is not None:
         assert return_args['content_type'] == content_type
+
+
+@pytest.mark.parametrize(
+    'result', [
+        {'foo': 'bar'},
+        Response(json.dumps({'foo': 'bar'}), mimetype='application/json'),
+    ]
+)
+def test_can_process_results_truncated(result):
+    response = process_response(result, max_response_length=5)
+    assert response['return_args']['result_bytes'] == 14
+    assert response['return_args']['result'] == '{"foo'
+    assert response['return_args']['truncated'] is True
 
 
 @pytest.mark.parametrize('data,serialized_data,content_type', [
@@ -483,7 +498,7 @@ def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['exception']['expected_error'] == False
+    assert worker_data['exception']['expected_error'] is False
     assert worker_data['status'] == 'error'
     assert "Something went wrong" in str(worker_data['exception']['exc'])
 
@@ -504,7 +519,7 @@ def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['provider'] == "Rpc"
-    assert worker_data['exception']['expected_error'] == True
+    assert worker_data['exception']['expected_error'] is True
     assert worker_data['status'] == 'error'
     assert "Invalid value" in str(worker_data['exception']['exc'])
 
@@ -551,6 +566,170 @@ def test_end_to_end(container_factory, config):
     assert logger.info.call_count == 2
 
 
+def test_end_to_end_default_response_truncation(container_factory, config):
+    class TestService(object):
+        name = "service"
+
+        entrypoint_logger = EntrypointLogger()
+
+        @rpc
+        def rpc_method(self):
+            return 'A' * 200
+
+        @rpc
+        def get_rpc(self):
+            return 'B' * 200
+
+        @rpc
+        def list_rpc(self):
+            return 'C' * 200
+
+        @rpc
+        def query_rpc(self):
+            return {'my_result': 'D' * 200}
+
+    container = container_factory(TestService, config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        # invoke all the service methods
+        for meth_name in ['rpc_method', 'get_rpc', 'list_rpc', 'query_rpc']:
+            with entrypoint_hook(container, meth_name) as rpc_meth:
+                with entrypoint_waiter(container, meth_name):
+                    rpc_meth()
+
+    def get_response_dict_from_log_call(log_call):
+        return json.loads(log_call[0][0])
+
+    assert logger.info.call_count == 8
+    rpc_method_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[1])
+    assert rpc_method_response['entrypoint'] == 'service.rpc_method'
+    assert rpc_method_response['return_args']['result_bytes'] == 200
+    assert rpc_method_response['return_args']['result'] == 'A' * 200
+    assert rpc_method_response['return_args']['truncated'] is False
+
+    get_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[3])
+    assert get_rpc_response['entrypoint'] == 'service.get_rpc'
+    assert get_rpc_response['return_args']['result_bytes'] == 200
+    assert get_rpc_response['return_args']['result'] == 'B' * 100
+    assert get_rpc_response['return_args']['truncated'] is True
+
+    list_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[5])
+    assert list_rpc_response['entrypoint'] == 'service.list_rpc'
+    assert list_rpc_response['return_args']['result_bytes'] == 200
+    assert list_rpc_response['return_args']['result'] == 'C' * 100
+    assert list_rpc_response['return_args']['truncated'] is True
+
+    query_rpc_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[7])
+    assert query_rpc_response['entrypoint'] == 'service.query_rpc'
+    assert query_rpc_response['return_args']['result_bytes'] == 217
+    assert query_rpc_response['return_args']['result'] == (
+        '{"my_result": "%s' % ('D' * 85)
+    )
+    assert query_rpc_response['return_args']['truncated'] is True
+
+
+def test_end_to_end_custom_response_truncation(container_factory, config):
+    class TestService(object):
+        name = "service"
+
+        entrypoint_logger = EntrypointLogger()
+
+        @rpc
+        def get_rpc1(self):
+            return 'A' * 200
+
+        @rpc
+        def get_rpc2(self):
+            return 'B' * 200
+
+        @rpc
+        def get_rpc3(self):
+            return 'C' * 200
+
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_RESPONSE_ENTRYPOINTS'] = [
+        'get_rpc1', 'get_rpc3'
+    ]
+
+    container = container_factory(TestService, custom_config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        # invoke all the service methods
+        for meth_name in ['get_rpc1', 'get_rpc2', 'get_rpc3']:
+            with entrypoint_hook(container, meth_name) as rpc_meth:
+                with entrypoint_waiter(container, meth_name):
+                    rpc_meth()
+
+    def get_response_dict_from_log_call(log_call):
+        return json.loads(log_call[0][0])
+
+    assert logger.info.call_count == 6
+    get_rpc1_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[1])
+    assert get_rpc1_response['entrypoint'] == 'service.get_rpc1'
+    assert get_rpc1_response['return_args']['result_bytes'] == 200
+    assert get_rpc1_response['return_args']['result'] == 'A' * 100
+    assert get_rpc1_response['return_args']['truncated'] is True
+
+    get_rpc2_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[3])
+    assert get_rpc2_response['entrypoint'] == 'service.get_rpc2'
+    assert get_rpc2_response['return_args']['result_bytes'] == 200
+    assert get_rpc2_response['return_args']['result'] == 'B' * 200
+    assert get_rpc2_response['return_args']['truncated'] is False
+
+    get_rpc3_response = get_response_dict_from_log_call(
+        logger.info.call_args_list[5])
+    assert get_rpc3_response['entrypoint'] == 'service.get_rpc3'
+    assert get_rpc3_response['return_args']['result_bytes'] == 200
+    assert get_rpc3_response['return_args']['result'] == 'C' * 100
+    assert get_rpc3_response['return_args']['truncated'] is True
+
+
+@pytest.mark.parametrize(
+    ('trunc_value', 'expected'), [
+        (None, []),
+        ([], []),
+        ("", []),
+        (['a', 'b'], [re.compile('a'), re.compile('b')]),
+    ]
+)
+def test_truncated_response_config(
+    mock_container, config, trunc_value, expected
+):
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_RESPONSE_ENTRYPOINTS'] = (
+        trunc_value
+    )
+    mock_container.config = custom_config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_response_entrypoints == expected
+
+
+def test_truncated_response_default_config(mock_container, config):
+    assert 'TRUNCATED_RESPONSE_ENTRYPOINTS' not in config['ENTRYPOINT_LOGGING']
+
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_response_entrypoints == [
+        re.compile('^get_|^list_|^query_')
+    ]
+
+
 def test_default_json_serializer_will_raise_value_error():
     with pytest.raises(ValueError):
         dumps({'weird_value': {None}})
@@ -564,3 +743,15 @@ def test_can_handle_exception_when_getting_worker_data():
         data = get_worker_data(worker_ctx)
 
     assert error_message in data['error']
+
+
+@pytest.mark.parametrize(
+    ('truncated_entrypoints', 'expected'), [
+        ([re.compile('foo')], False),
+        ([re.compile('foo'), re.compile('rpc_method')], True),
+        ([re.compile('rpc_method'), re.compile('foo')], True),
+    ]
+)
+def test_should_truncate(rpc_worker_ctx, truncated_entrypoints, expected):
+    result = should_truncate(rpc_worker_ctx, truncated_entrypoints)
+    assert result == expected

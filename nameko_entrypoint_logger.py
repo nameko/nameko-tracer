@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import re
 import socket
 from datetime import datetime
 from traceback import format_tb
@@ -34,6 +35,9 @@ class EntrypointLogger(DependencyProvider):
         'EXCHANGE_NAME',
         'ROUTING_KEY'
     )
+
+    default_truncated_response_entrypoints = ['^get_|^list_|^query_']
+    truncated_response_length = 100
 
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
@@ -78,6 +82,14 @@ class EntrypointLogger(DependencyProvider):
 
         self.logger = logger
 
+        truncated_response_entrypoints = config.get(
+            'TRUNCATED_RESPONSE_ENTRYPOINTS',
+            self.default_truncated_response_entrypoints
+        )
+        self.truncated_response_entrypoints = [
+            re.compile(r) for r in truncated_response_entrypoints or []
+        ]
+
     def worker_setup(self, worker_ctx):
 
         try:
@@ -115,11 +127,18 @@ class EntrypointLogger(DependencyProvider):
             })
 
             if exc_info is None:
+                max_response_length = None
+                if should_truncate(
+                    worker_ctx, self.truncated_response_entrypoints
+                ):
+                    max_response_length = self.truncated_response_length
 
                 data['status'] = 'success'
 
                 data.update(
-                    process_response(result)
+                    process_response(
+                        result, max_response_length=max_response_length
+                    )
                 )
             else:
 
@@ -291,20 +310,40 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def process_response(result):
-    data = {}
+def truncate_response(return_args, max_response_length):
+    if return_args:
+        if (
+            max_response_length is not None and
+            len(return_args['result']) > max_response_length
+        ):
+            return_args['result'] = return_args['result'][:max_response_length]
+            return_args['truncated'] = True
+        else:
+            return_args['truncated'] = False
 
+
+def process_response(result, max_response_length=None):
+    return_args = None
     if isinstance(result, Response):
-        data['return_args'] = get_http_response(result)
+        # spceific case for processing HTTP response
+        return_args = {
+            'content_type': result.content_type,
+            'result': to_string(result.get_data()),
+            'status_code': result.status_code,
+            'result_bytes': result.content_length,
+        }
     else:
+        # All other responses
         result_string = to_string(safe_for_serialization(result))
         if result_string is not None:
             result_bytes = len(result_string)
-            data['return_args'] = {
+            return_args = {
                 'result_bytes': result_bytes,
                 'result': result_string,
             }
-    return data
+
+    truncate_response(return_args, max_response_length)
+    return {'return_args': return_args} if return_args else {}
 
 
 def process_exception(worker_ctx, exc_info):
@@ -341,15 +380,6 @@ def get_http_request(request):
     }
 
 
-def get_http_response(response):
-    return {
-        'content_type': response.content_type,
-        'result': to_string(response.get_data()),
-        'status_code': response.status_code,
-        'result_bytes': response.content_length,
-    }
-
-
 def get_headers(environ):
     """
     Returns only proper HTTP headers.
@@ -379,3 +409,8 @@ def to_string(value):
         return json.dumps(value)
     if isinstance(value, bytes):
         return value.decode("utf-8")
+
+
+def should_truncate(worker_ctx, truncated_entrypoints):
+    entrypoint_name = worker_ctx.entrypoint.method_name
+    return any(regex.match(entrypoint_name) for regex in truncated_entrypoints)
