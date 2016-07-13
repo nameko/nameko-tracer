@@ -310,22 +310,37 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def process_response(result, max_response_length=None):
-    data = {}
+def truncate_response(return_args, max_response_length):
+    if return_args:
+        if (
+            max_response_length is not None and
+            len(return_args['result']) > max_response_length
+        ):
+            return_args['result'] = return_args['result'][:max_response_length]
 
+
+def process_response(result, max_response_length=None):
+    return_args = None
     if isinstance(result, Response):
-        data['return_args'] = get_http_response(result)
+        # spceific case for processing HTTP response
+        return_args = {
+            'content_type': result.content_type,
+            'result': to_string(result.get_data()),
+            'status_code': result.status_code,
+            'result_bytes': result.content_length,
+        }
     else:
+        # All other responses
         result_string = to_string(safe_for_serialization(result))
         if result_string is not None:
             result_bytes = len(result_string)
-            if max_response_length is not None:
-                result_string = result_string[:max_response_length]
-            data['return_args'] = {
+            return_args = {
                 'result_bytes': result_bytes,
                 'result': result_string,
             }
-    return data
+
+    truncate_response(return_args, max_response_length)
+    return {'return_args': return_args} if return_args else {}
 
 
 def process_exception(worker_ctx, exc_info):
@@ -359,15 +374,6 @@ def get_http_request(request):
         'data': to_string(data),
         'headers': dict(get_headers(request.environ)),
         'env': dict(get_environ(request.environ)),
-    }
-
-
-def get_http_response(response):
-    return {
-        'content_type': response.content_type,
-        'result': to_string(response.get_data()),
-        'status_code': response.status_code,
-        'result_bytes': response.content_length,
     }
 
 

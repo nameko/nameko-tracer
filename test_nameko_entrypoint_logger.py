@@ -373,8 +373,14 @@ def test_can_process_results(
         assert return_args['content_type'] == content_type
 
 
-def test_can_process_results_truncated():
-    response = process_response({'foo': 'bar'}, max_response_length=5)
+@pytest.mark.parametrize(
+    'result', [
+        {'foo': 'bar'},
+        Response(json.dumps({'foo': 'bar'}), mimetype='application/json'),
+    ]
+)
+def test_can_process_results_truncated(result):
+    response = process_response(result, max_response_length=5)
     assert response['return_args']['result_bytes'] == 14
     assert response['return_args']['result'] == '{"foo'
 
