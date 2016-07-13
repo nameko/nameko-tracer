@@ -732,7 +732,6 @@ def test_can_handle_exception_when_getting_worker_data():
 
 @pytest.mark.parametrize(
     ('truncated_entrypoints', 'expected'), [
-        (None, False),
         ([re.compile('foo')], False),
         ([re.compile('foo'), re.compile('rpc_method')], True),
         ([re.compile('rpc_method'), re.compile('foo')], True),

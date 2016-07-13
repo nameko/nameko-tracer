@@ -404,8 +404,4 @@ def to_string(value):
 
 def should_truncate(worker_ctx, truncated_entrypoints):
     entrypoint_name = worker_ctx.entrypoint.method_name
-    if truncated_entrypoints:
-        for regex in truncated_entrypoints:
-            if regex.match(entrypoint_name):
-                return True
-    return False
+    return any(regex.match(entrypoint_name) for regex in truncated_entrypoints)
