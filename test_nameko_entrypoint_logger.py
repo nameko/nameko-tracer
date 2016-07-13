@@ -682,6 +682,39 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc3_response['return_args']['result'] == 'C' * 100
 
 
+@pytest.mark.parametrize(
+    ('trunc_value', 'expected'), [
+        (None, []),
+        ([], []),
+        ("", []),
+        (['a', 'b'], [re.compile('a'), re.compile('b')]),
+    ]
+)
+def test_truncated_response_config(
+    mock_container, config, trunc_value, expected
+):
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_RESPONSE_ENTRYPOINTS'] = (
+        trunc_value
+    )
+    mock_container.config = custom_config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_response_entrypoints == expected
+
+
+def test_truncated_response_default_config(mock_container, config):
+    assert 'TRUNCATED_RESPONSE_ENTRYPOINTS' not in config['ENTRYPOINT_LOGGING']
+
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_response_entrypoints == [
+        re.compile('^get_|^list_|^query_')
+    ]
+
+
 def test_default_json_serializer_will_raise_value_error():
     with pytest.raises(ValueError):
         dumps({'weird_value': {None}})

@@ -82,12 +82,12 @@ class EntrypointLogger(DependencyProvider):
 
         self.logger = logger
 
-        if 'TRUNCATED_RESPONSE_ENTRYPOINTS' in config:
-            truncated_entrypoints = config['TRUNCATED_RESPONSE_ENTRYPOINTS']
-        else:
-            truncated_entrypoints = self.default_truncated_response_entrypoints
+        truncated_response_entrypoints = config.get(
+            'TRUNCATED_RESPONSE_ENTRYPOINTS',
+            self.default_truncated_response_entrypoints
+        )
         self.truncated_response_entrypoints = [
-            re.compile(r) for r in truncated_entrypoints or []
+            re.compile(r) for r in truncated_response_entrypoints or []
         ]
 
     def worker_setup(self, worker_ctx):
