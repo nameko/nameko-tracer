@@ -1,12 +1,12 @@
 nameko-entrypoint-logger
 ========================
 
-[Nameko](https://github.com/onefinestay/nameko) extension for logging entrypoint invocation to RabbitMQ   
+[Nameko](https://github.com/onefinestay/nameko) extension for logging entrypoint invocation to RabbitMQ
 
 Usage
 -----
 
-Assuming service is configured to run with RabbitMQ.  
+Assuming service is configured to run with RabbitMQ.
 
 Add Entrypoint logging configuration to your nameko config file:
 
@@ -19,6 +19,10 @@ Add Entrypoint logging configuration to your nameko config file:
         ROUTING_KEY: "entrypoint_log"
         SERIALIZER: "json" # Optional. For example, json, raw, or pickle. Defaults to 'json'
         CONTENT_TYPE: "application/json" # Optional. Can be set to any valid MIME type. Defaults to 'application/json'
+        TRUNCATED_RESPONSE_ENTRYPOINTS:  # Optional. List of regex strings identifying entrypoints whose response data should be truncated when logging. Defaults to "^get_|^list_|^query_"
+            - "method_1"
+            - "^get_|^list_"
+
     ...
 ```
 
@@ -63,7 +67,7 @@ Sample Message: Lifecycle Stage: **request**
     "call_stack": [
         "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4"
     ],
-    "call_id": "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4",    
+    "call_id": "demo_service.get_method.e390af6a-a425-487c-adfa-7e8c00b78fa4",
     "call_args": {
         "args": "{\"value\": \"999\"}",
         "request": {
@@ -83,7 +87,7 @@ Sample Message: Lifecycle Stage: **request**
                 "user_agent": "My User Agent String"
             }
         }
-    }   
+    }
 }
 ```
 
@@ -96,7 +100,7 @@ Sample Message: Lifecycle Stage: **response**
     "provider": "HttpRequestHandler",
     "service": "demo_service",
     "provider_name": "get_method",
-    "entrypoint": "demo_service.get_method",    
+    "entrypoint": "demo_service.get_method",
     "hostname": "BOB-MAC.lan",
     "timestamp": "2015-11-26T10:15:02.026442",
     "status": "success",
