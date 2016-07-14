@@ -107,18 +107,21 @@ def http_entrypoint(container):
 
 
 @pytest.fixture
-def http_worker_ctx(container, http_entrypoint):
+def http_request():
     environ = create_environ(
         '/get/1?test=123',
         'http://localhost:8080/',
         data=json.dumps({'foo': 'bar'}),
         content_type='application/json'
     )
+    return Request(environ)
 
-    request = Request(environ)
+
+@pytest.fixture
+def http_worker_ctx(container, http_entrypoint, http_request):
 
     return WorkerContext(
-        container, Service, http_entrypoint, args=(request, 1)
+        container, Service, http_entrypoint, args=(http_request, 1)
     )
 
 
@@ -157,6 +160,10 @@ def supported_workers(
 def dummy_worker_ctx(mock_container):
     mock_container.service_name = "service"
     return WorkerContext(mock_container, None, DummyProvider())
+
+
+def get_dict_from_mock_log_call(log_call):
+    return json.loads(log_call[0][0])
 
 
 def test_setup(entrypoint_logger):
@@ -325,17 +332,13 @@ def test_will_call_get_http_request(supported_workers):
 def test_will_get_event_worker_redacted_callargs(event_worker_ctx):
     data = get_worker_data(event_worker_ctx)
 
-    assert data['call_args'] == {
-        'redacted_args': '{"payload": "bar"}'
-    }
+    assert data['call_args']['redacted_args'] == '{"payload": "bar"}'
 
 
 def test_will_get_rpc_worker_redacted_callargs(rpc_worker_ctx):
     data = get_worker_data(rpc_worker_ctx)
 
-    assert data['call_args'] == {
-        'redacted_args': '{"foo": "bar"}'
-    }
+    assert data['call_args']['redacted_args'] == '{"foo": "bar"}'
 
 
 @pytest.mark.parametrize(
@@ -543,7 +546,7 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     assert worker_data['exception']['exc'] == '[exc serialization failed]'
 
 
-def test_end_to_end(container_factory, config):
+def test_end_to_end(container_factory, config, http_request):
     class TestService(object):
         name = "service"
 
@@ -551,6 +554,10 @@ def test_end_to_end(container_factory, config):
 
         @rpc
         def rpc_method(self):
+            pass
+
+        @http('GET', '/gogogo/')
+        def http_method(self, request):
             pass
 
     container = container_factory(TestService, config)
@@ -562,8 +569,12 @@ def test_end_to_end(container_factory, config):
         with entrypoint_hook(container, 'rpc_method') as rpc_method:
             with entrypoint_waiter(container, 'rpc_method'):
                 rpc_method()
+        assert logger.info.call_count == 2
 
-    assert logger.info.call_count == 2
+        with entrypoint_hook(container, 'http_method') as http_method:
+            with entrypoint_waiter(container, 'http_method'):
+                http_method(http_request)
+        assert logger.info.call_count == 4
 
 
 def test_end_to_end_default_response_truncation(container_factory, config):
@@ -600,32 +611,29 @@ def test_end_to_end_default_response_truncation(container_factory, config):
                 with entrypoint_waiter(container, meth_name):
                     rpc_meth()
 
-    def get_response_dict_from_log_call(log_call):
-        return json.loads(log_call[0][0])
-
     assert logger.info.call_count == 8
-    rpc_method_response = get_response_dict_from_log_call(
+    rpc_method_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[1])
     assert rpc_method_response['entrypoint'] == 'service.rpc_method'
     assert rpc_method_response['return_args']['result_bytes'] == 200
     assert rpc_method_response['return_args']['result'] == 'A' * 200
     assert rpc_method_response['return_args']['truncated'] is False
 
-    get_rpc_response = get_response_dict_from_log_call(
+    get_rpc_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[3])
     assert get_rpc_response['entrypoint'] == 'service.get_rpc'
     assert get_rpc_response['return_args']['result_bytes'] == 200
     assert get_rpc_response['return_args']['result'] == 'B' * 100
     assert get_rpc_response['return_args']['truncated'] is True
 
-    list_rpc_response = get_response_dict_from_log_call(
+    list_rpc_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[5])
     assert list_rpc_response['entrypoint'] == 'service.list_rpc'
     assert list_rpc_response['return_args']['result_bytes'] == 200
     assert list_rpc_response['return_args']['result'] == 'C' * 100
     assert list_rpc_response['return_args']['truncated'] is True
 
-    query_rpc_response = get_response_dict_from_log_call(
+    query_rpc_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[7])
     assert query_rpc_response['entrypoint'] == 'service.query_rpc'
     assert query_rpc_response['return_args']['result_bytes'] == 217
@@ -671,30 +679,119 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
                 with entrypoint_waiter(container, meth_name):
                     rpc_meth()
 
-    def get_response_dict_from_log_call(log_call):
-        return json.loads(log_call[0][0])
-
     assert logger.info.call_count == 6
-    get_rpc1_response = get_response_dict_from_log_call(
+    get_rpc1_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[1])
     assert get_rpc1_response['entrypoint'] == 'service.get_rpc1'
     assert get_rpc1_response['return_args']['result_bytes'] == 200
     assert get_rpc1_response['return_args']['result'] == 'A' * 100
     assert get_rpc1_response['return_args']['truncated'] is True
 
-    get_rpc2_response = get_response_dict_from_log_call(
+    get_rpc2_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[3])
     assert get_rpc2_response['entrypoint'] == 'service.get_rpc2'
     assert get_rpc2_response['return_args']['result_bytes'] == 200
     assert get_rpc2_response['return_args']['result'] == 'B' * 200
     assert get_rpc2_response['return_args']['truncated'] is False
 
-    get_rpc3_response = get_response_dict_from_log_call(
+    get_rpc3_response = get_dict_from_mock_log_call(
         logger.info.call_args_list[5])
     assert get_rpc3_response['entrypoint'] == 'service.get_rpc3'
     assert get_rpc3_response['return_args']['result_bytes'] == 200
     assert get_rpc3_response['return_args']['result'] == 'C' * 100
     assert get_rpc3_response['return_args']['truncated'] is True
+
+
+def test_end_to_end_custom_args_truncation(
+    container_factory, config, http_request
+):
+    class TestService(object):
+        name = "service"
+
+        entrypoint_logger = EntrypointLogger()
+
+        @rpc
+        def get_rpc1(self, arg1):
+            pass
+
+        @rpc
+        def get_rpc2(self, arg1):
+            pass
+
+        @http('POST', '/send1/')
+        def send_http1(self, request, arg1):
+            pass
+
+        @http('POST', '/send2/')
+        def send_http2(self, request, arg1):
+            pass
+
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_ARGS_ENTRYPOINTS'] = [
+        'get_rpc1', 'send_http2'
+    ]
+
+    container = container_factory(TestService, custom_config)
+    container.start()
+
+    logger = get_extension(container, EntrypointLogger)
+
+    with patch.object(logger, 'logger') as logger:
+        # invoke all the service methods
+        with entrypoint_hook(container, 'get_rpc1') as get_rpc1:
+            with entrypoint_waiter(container, 'get_rpc1'):
+                get_rpc1('A' * 200)
+        with entrypoint_hook(container, 'get_rpc2') as get_rpc2:
+            with entrypoint_waiter(container, 'get_rpc2'):
+                get_rpc2('B' * 200)
+        with entrypoint_hook(container, 'send_http1') as send_http1:
+            with entrypoint_waiter(container, 'send_http1'):
+                http_request.data = b'C' * 200
+                send_http1(http_request, 'D' * 200)
+        with entrypoint_hook(container, 'send_http2') as send_http2:
+            with entrypoint_waiter(container, 'send_http2'):
+                http_request.data = b'E' * 200
+                send_http2(http_request, 'F' * 200)
+
+    assert logger.info.call_count == 8
+    for log_index in [0, 1]:
+        log_dict = get_dict_from_mock_log_call(
+            logger.info.call_args_list[log_index]
+        )
+        assert log_dict['entrypoint'] == 'service.get_rpc1'
+        assert log_dict['call_args']['redacted_args'] == (
+            '{"arg1": "%s' % ('A' * 90)
+        )
+        assert log_dict['call_args']['truncated'] is True
+
+    for log_index in [2, 3]:
+        log_dict = get_dict_from_mock_log_call(
+            logger.info.call_args_list[log_index]
+        )
+        assert log_dict['entrypoint'] == 'service.get_rpc2'
+        assert log_dict['call_args']['redacted_args'] == (
+            '{"arg1": "%s"}' % ('B' * 200)
+        )
+        assert log_dict['call_args']['truncated'] is False
+
+    for log_index in [4, 5]:
+        log_dict = get_dict_from_mock_log_call(
+            logger.info.call_args_list[log_index]
+        )
+        assert log_dict['entrypoint'] == 'service.send_http1'
+        assert log_dict['call_args']['request']['data'] == 'C' * 200
+        assert log_dict['call_args']['args'] == '{"arg1": "%s"}' % ('D' * 200)
+        assert log_dict['call_args']['truncated'] is False
+
+    for log_index in [6, 7]:
+        log_dict = get_dict_from_mock_log_call(
+            logger.info.call_args_list[log_index]
+        )
+        assert log_dict['entrypoint'] == 'service.send_http2'
+        assert log_dict['call_args']['request']['data'] == 'E' * 100
+        assert log_dict['call_args']['args'] == '{"arg1": "%s' % ('F' * 90)
+        assert log_dict['call_args']['truncated'] is True
 
 
 @pytest.mark.parametrize(
@@ -730,6 +827,109 @@ def test_truncated_response_default_config(mock_container, config):
     ]
 
 
+@pytest.mark.parametrize(
+    ('trunc_value', 'expected'), [
+        (None, []),
+        ([], []),
+        ("", []),
+        (['a', 'b'], [re.compile('a'), re.compile('b')]),
+    ]
+)
+def test_truncated_args_config(
+    mock_container, config, trunc_value, expected
+):
+    custom_config = {}
+    custom_config.update(config)
+    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_ARGS_ENTRYPOINTS'] = (
+        trunc_value
+    )
+    mock_container.config = custom_config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_args_entrypoints == expected
+
+
+def test_truncated_args_default_config(mock_container, config):
+    assert 'TRUNCATED_ARGS_ENTRYPOINTS' not in config['ENTRYPOINT_LOGGING']
+
+    mock_container.config = config
+    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
+    dependency_provider.setup()
+    assert dependency_provider.truncated_args_entrypoints == []
+
+
+@pytest.mark.parametrize(
+    ('truncated_entrypoints', 'expected'), [
+        ([re.compile('foo')], False),
+        ([re.compile('foo'), re.compile('rpc_method')], True),
+        ([re.compile('rpc_method'), re.compile('foo')], True),
+    ]
+)
+def test_should_truncate(rpc_worker_ctx, truncated_entrypoints, expected):
+    result = should_truncate(rpc_worker_ctx, truncated_entrypoints)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ('max_length', 'expected_truncated', 'expected_args', 'expected_data'), [
+        (4, True, '{"va', '{"fo'),
+        (7, True, '{"value', '{"foo":'),
+        (100, False, '{"value": "1"}', '{"foo": "bar"}'),
+    ]
+)
+def test_truncate_http_args(
+    entrypoint_logger, http_worker_ctx,
+    max_length, expected_truncated, expected_args, expected_data
+):
+    entrypoint_logger.truncated_args_entrypoints = [
+        re.compile('get_method')
+    ]
+    entrypoint_logger.truncated_args_length = max_length
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        # Call both worker_setup and worker_result as `args` are logged for
+        # both events.
+        entrypoint_logger.worker_setup(http_worker_ctx)
+        entrypoint_logger.worker_result(http_worker_ctx)
+
+    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
+    assert request_log['call_args']['request']['data'] == expected_data
+    assert request_log['call_args']['args'] == expected_args
+    assert request_log['call_args']['truncated'] is expected_truncated
+    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
+    assert response_log['call_args']['request']['data'] == expected_data
+    assert response_log['call_args']['args'] == expected_args
+    assert response_log['call_args']['truncated'] is expected_truncated
+
+
+@pytest.mark.parametrize(
+    ('max_length', 'expected_truncated', 'expected_args'), [
+        (4, True, '{"fo'),
+        (7, True, '{"foo":'),
+        (100, False, '{"foo": "bar"}'),
+    ]
+)
+def test_truncate_rpc_args(
+    entrypoint_logger, rpc_worker_ctx,
+    max_length, expected_truncated, expected_args
+):
+    entrypoint_logger.truncated_args_entrypoints = [
+        re.compile('rpc_method')
+    ]
+    entrypoint_logger.truncated_args_length = max_length
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        # Call both worker_setup and worker_result as `args` are logged for
+        # both events.
+        entrypoint_logger.worker_setup(rpc_worker_ctx)
+        entrypoint_logger.worker_result(rpc_worker_ctx)
+
+    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
+    assert request_log['call_args']['redacted_args'] == expected_args
+    assert request_log['call_args']['truncated'] is expected_truncated
+    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
+    assert response_log['call_args']['redacted_args'] == expected_args
+    assert response_log['call_args']['truncated'] is expected_truncated
+
+
 def test_default_json_serializer_will_raise_value_error():
     with pytest.raises(ValueError):
         dumps({'weird_value': {None}})
@@ -743,15 +943,3 @@ def test_can_handle_exception_when_getting_worker_data():
         data = get_worker_data(worker_ctx)
 
     assert error_message in data['error']
-
-
-@pytest.mark.parametrize(
-    ('truncated_entrypoints', 'expected'), [
-        ([re.compile('foo')], False),
-        ([re.compile('foo'), re.compile('rpc_method')], True),
-        ([re.compile('rpc_method'), re.compile('foo')], True),
-    ]
-)
-def test_should_truncate(rpc_worker_ctx, truncated_entrypoints, expected):
-    result = should_truncate(rpc_worker_ctx, truncated_entrypoints)
-    assert result == expected

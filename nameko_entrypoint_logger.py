@@ -37,7 +37,9 @@ class EntrypointLogger(DependencyProvider):
     )
 
     default_truncated_response_entrypoints = ['^get_|^list_|^query_']
+    default_truncated_args_entrypoints = []
     truncated_response_length = 100
+    truncated_args_length = 100
 
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
@@ -52,6 +54,11 @@ class EntrypointLogger(DependencyProvider):
         self.logger = None
         self.enabled = False
         self.worker_timestamps = WeakKeyDictionary()
+
+    def _compile_truncated_config(self, config, config_name, default):
+        return [
+            re.compile(r) for r in config.get(config_name, default) or []
+        ]
 
     def setup(self):
 
@@ -82,22 +89,37 @@ class EntrypointLogger(DependencyProvider):
 
         self.logger = logger
 
-        truncated_response_entrypoints = config.get(
+        self.truncated_response_entrypoints = self._compile_truncated_config(
+            config,
             'TRUNCATED_RESPONSE_ENTRYPOINTS',
             self.default_truncated_response_entrypoints
         )
-        self.truncated_response_entrypoints = [
-            re.compile(r) for r in truncated_response_entrypoints or []
-        ]
+        self.truncated_args_entrypoints = self._compile_truncated_config(
+            config,
+            'TRUNCATED_ARGS_ENTRYPOINTS',
+            self.default_truncated_args_entrypoints
+        )
+
+    def _max_args_length(self, worker_ctx):
+        if should_truncate(worker_ctx, self.truncated_args_entrypoints):
+            return self.truncated_args_length
+        return None
+
+    def _max_response_length(self, worker_ctx):
+        if should_truncate(worker_ctx, self.truncated_response_entrypoints):
+            return self.truncated_response_length
+        return None
 
     def worker_setup(self, worker_ctx):
-
         try:
 
             if not self.should_log(worker_ctx.entrypoint):
                 return
 
-            data = get_worker_data(worker_ctx)
+            max_args_length = self._max_args_length(worker_ctx)
+            data = get_worker_data(
+                worker_ctx, max_args_length=max_args_length
+            )
 
             data.update({
                 'lifecycle_stage': 'request'
@@ -117,7 +139,10 @@ class EntrypointLogger(DependencyProvider):
             if not self.should_log(worker_ctx.entrypoint):
                 return
 
-            data = get_worker_data(worker_ctx)
+            max_args_length = self._max_args_length(worker_ctx)
+            data = get_worker_data(
+                worker_ctx, max_args_length=max_args_length
+            )
 
             response_time = self.calculate_response_time(data, worker_ctx)
 
@@ -127,14 +152,9 @@ class EntrypointLogger(DependencyProvider):
             })
 
             if exc_info is None:
-                max_response_length = None
-                if should_truncate(
-                    worker_ctx, self.truncated_response_entrypoints
-                ):
-                    max_response_length = self.truncated_response_length
-
                 data['status'] = 'success'
 
+                max_response_length = self._max_response_length(worker_ctx)
                 data.update(
                     process_response(
                         result, max_response_length=max_response_length
@@ -241,7 +261,7 @@ def logging_publisher(config):
     return publish
 
 
-def get_worker_data(worker_ctx):
+def get_worker_data(worker_ctx, max_args_length=None):
     data = {
         'timestamp': datetime.utcnow()
     }
@@ -274,6 +294,8 @@ def get_worker_data(worker_ctx):
                 )
 
             call_args['args'] = to_string(safe_for_serialization(args))
+
+        truncate_request(call_args, max_args_length)
 
         data.update({
             'provider': type(provider).__name__,
@@ -310,13 +332,35 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def truncate_response(return_args, max_response_length):
+def truncate_request(call_args, max_length):
+    if call_args:
+        call_args['truncated'] = False
+        request = call_args.get('request')
+
+        if max_length is not None:
+
+            if request and len(request.get('data', '')) > max_length:
+                request['data'] = request['data'][:max_length]
+                call_args['truncated'] = True
+
+            if len(call_args.get('redacted_args', '')) > max_length:
+                call_args['redacted_args'] = (
+                    call_args['redacted_args'][:max_length]
+                )
+                call_args['truncated'] = True
+
+            if len(call_args.get('args', '')) > max_length:
+                call_args['args'] = call_args['args'][:max_length]
+                call_args['truncated'] = True
+
+
+def truncate_response(return_args, max_length):
     if return_args:
         if (
-            max_response_length is not None and
-            len(return_args['result']) > max_response_length
+            max_length is not None and
+            len(return_args['result']) > max_length
         ):
-            return_args['result'] = return_args['result'][:max_response_length]
+            return_args['result'] = return_args['result'][:max_length]
             return_args['truncated'] = True
         else:
             return_args['truncated'] = False
