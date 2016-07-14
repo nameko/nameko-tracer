@@ -22,7 +22,9 @@ Add Entrypoint logging configuration to your nameko config file:
         TRUNCATED_RESPONSE_ENTRYPOINTS:  # Optional. List of regex strings identifying entrypoints whose response data should be truncated when logging. Defaults to "^get_|^list_|^query_"
             - "method_1"
             - "^get_|^list_"
-
+        TRUNCATED_ARGS_ENTRYPOINTS: # Optional. List of regex strings identifying entrypoints whose request args should be truncated when logging. Fields that may be truncated are: `call_args.args`, `call_args.redacted_args`, `call_args.request.data`.
+            - "method_1"
+            - "^post_big_data$"
     ...
 ```
 
@@ -86,7 +88,8 @@ Sample Message: Lifecycle Stage: **request**
                 "host": "localhost:8000",
                 "user_agent": "My User Agent String"
             }
-        }
+        },
+        "truncated": false
     }
 }
 ```
@@ -127,13 +130,15 @@ Sample Message: Lifecycle Stage: **response**
                 "host": "localhost:8000",
                 "user_agent": "My User Agent String"
             }
-        }
+        },
+        "truncated": false
     },
     "return_args": {
         "result_bytes": 14,
         "content_type": "application/json",
         "result": "{\"value\": 999}",
-        "status_code": 200
+        "status_code": 200,
+        "truncated": false
     }
 }
 ```
