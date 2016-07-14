@@ -295,7 +295,7 @@ def get_worker_data(worker_ctx, max_args_length=None):
 
             call_args['args'] = to_string(safe_for_serialization(args))
 
-        truncate_request(call_args, max_args_length)
+        truncate_args(call_args, max_args_length)
 
         data.update({
             'provider': type(provider).__name__,
@@ -332,25 +332,21 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def truncate_request(call_args, max_length):
-    if call_args:
-        call_args['truncated'] = False
-        request = call_args.get('request')
+def truncate_args(call_args, max_length):
+    call_args['truncated'] = False
+    request = call_args.get('request')
 
-        if max_length is not None:
+    if max_length is not None:
 
-            if request and len(request.get('data') or '') > max_length:
-                request['data'] = request['data'][:max_length]
-                call_args['truncated'] = True
+        checks = [
+            (request, 'data'),
+            (call_args, 'redacted_args'),
+            (call_args, 'args')
+        ]
 
-            if len(call_args.get('redacted_args') or '') > max_length:
-                call_args['redacted_args'] = (
-                    call_args['redacted_args'][:max_length]
-                )
-                call_args['truncated'] = True
-
-            if len(call_args.get('args') or '') > max_length:
-                call_args['args'] = call_args['args'][:max_length]
+        for parent, field in checks:
+            if parent and len(parent.get(field) or '') > max_length:
+                parent[field] = parent[field][:max_length]
                 call_args['truncated'] = True
 
 
