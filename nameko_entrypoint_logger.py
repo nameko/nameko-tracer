@@ -339,17 +339,17 @@ def truncate_request(call_args, max_length):
 
         if max_length is not None:
 
-            if request and len(request.get('data', '')) > max_length:
+            if request and len(request.get('data') or '') > max_length:
                 request['data'] = request['data'][:max_length]
                 call_args['truncated'] = True
 
-            if len(call_args.get('redacted_args', '')) > max_length:
+            if len(call_args.get('redacted_args') or '') > max_length:
                 call_args['redacted_args'] = (
                     call_args['redacted_args'][:max_length]
                 )
                 call_args['truncated'] = True
 
-            if len(call_args.get('args', '')) > max_length:
+            if len(call_args.get('args') or '') > max_length:
                 call_args['args'] = call_args['args'][:max_length]
                 call_args['truncated'] = True
 
