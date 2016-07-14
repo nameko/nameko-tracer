@@ -42,6 +42,10 @@ class Service(object):
     def rpc_method(self, foo):
         pass
 
+    @rpc(expected_exceptions=CustomException, sensitive_variables='password')
+    def sensitive_rpc_method(self, password):
+        pass
+
     @http('GET', '/get/<int:value>')
     def get_method(self, request, value):
         payload = {'value': value}
@@ -100,6 +104,17 @@ def rpc_worker_ctx(container):
 
 
 @pytest.fixture
+def sensitive_rpc_worker_ctx(container):
+    entrypoint = get_extension(
+        container, Rpc, method_name="sensitive_rpc_method"
+    )
+
+    return WorkerContext(
+        container, Service, entrypoint, args=("pwd",)
+    )
+
+
+@pytest.fixture
 def http_entrypoint(container):
     return get_extension(
         container, HttpRequestHandler, method_name="get_method"
@@ -149,10 +164,12 @@ def consumer_worker_ctx(container):
 
 @pytest.fixture
 def supported_workers(
-    rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx
+    rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx,
+    sensitive_rpc_worker_ctx
 ):
     return [
-        rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx
+        rpc_worker_ctx, http_worker_ctx, event_worker_ctx, consumer_worker_ctx,
+        sensitive_rpc_worker_ctx
     ]
 
 
@@ -318,7 +335,7 @@ def test_will_call_get_redacted_callargs(supported_workers):
         for worker in supported_workers:
             get_worker_data(worker)
 
-    assert get_args.call_count == 2
+    assert get_args.call_count == 1
 
 
 def test_will_call_get_http_request(supported_workers):
@@ -329,16 +346,24 @@ def test_will_call_get_http_request(supported_workers):
     assert get_request.call_count == 1
 
 
-def test_will_get_event_worker_redacted_callargs(event_worker_ctx):
+def test_will_get_event_worker_callargs(event_worker_ctx):
     data = get_worker_data(event_worker_ctx)
 
-    assert data['call_args']['redacted_args'] == '{"payload": "bar"}'
+    assert data['call_args']['args'] == '{"payload": "bar"}'
 
 
-def test_will_get_rpc_worker_redacted_callargs(rpc_worker_ctx):
+def test_will_get_rpc_worker_callargs(rpc_worker_ctx):
     data = get_worker_data(rpc_worker_ctx)
 
-    assert data['call_args']['redacted_args'] == '{"foo": "bar"}'
+    assert data['call_args']['args'] == '{"foo": "bar"}'
+
+
+def test_will_get_sensitive_rpc_worker_redacted_callargs(
+    sensitive_rpc_worker_ctx
+):
+    data = get_worker_data(sensitive_rpc_worker_ctx)
+
+    assert data['call_args']['redacted_args'] == '{"password": "********"}'
 
 
 @pytest.mark.parametrize(
@@ -718,6 +743,10 @@ def test_end_to_end_custom_args_truncation(
         def get_rpc2(self, arg1):
             pass
 
+        @rpc(sensitive_variables='password')
+        def get_rpc3(self, arg1, password):
+            pass
+
         @http('POST', '/send1/')
         def send_http1(self, request, arg1):
             pass
@@ -729,7 +758,7 @@ def test_end_to_end_custom_args_truncation(
     custom_config = {}
     custom_config.update(config)
     custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_ARGS_ENTRYPOINTS'] = [
-        'get_rpc1', 'send_http2'
+        'get_rpc1', 'get_rpc3', 'send_http2'
     ]
 
     container = container_factory(TestService, custom_config)
@@ -745,6 +774,9 @@ def test_end_to_end_custom_args_truncation(
         with entrypoint_hook(container, 'get_rpc2') as get_rpc2:
             with entrypoint_waiter(container, 'get_rpc2'):
                 get_rpc2('B' * 200)
+        with entrypoint_hook(container, 'get_rpc3') as get_rpc3:
+            with entrypoint_waiter(container, 'get_rpc3'):
+                get_rpc3('P' * 200, 'spamfishcloud')
         with entrypoint_hook(container, 'send_http1') as send_http1:
             with entrypoint_waiter(container, 'send_http1'):
                 http_request.data = b'C' * 200
@@ -754,13 +786,13 @@ def test_end_to_end_custom_args_truncation(
                 http_request.data = b'E' * 200
                 send_http2(http_request, 'F' * 200)
 
-    assert logger.info.call_count == 8
+    assert logger.info.call_count == 10
     for log_index in [0, 1]:
         log_dict = get_dict_from_mock_log_call(
             logger.info.call_args_list[log_index]
         )
         assert log_dict['entrypoint'] == 'service.get_rpc1'
-        assert log_dict['call_args']['redacted_args'] == (
+        assert log_dict['call_args']['args'] == (
             '{"arg1": "%s' % ('A' * 90)
         )
         assert log_dict['call_args']['truncated'] is True
@@ -770,7 +802,7 @@ def test_end_to_end_custom_args_truncation(
             logger.info.call_args_list[log_index]
         )
         assert log_dict['entrypoint'] == 'service.get_rpc2'
-        assert log_dict['call_args']['redacted_args'] == (
+        assert log_dict['call_args']['args'] == (
             '{"arg1": "%s"}' % ('B' * 200)
         )
         assert log_dict['call_args']['truncated'] is False
@@ -779,12 +811,20 @@ def test_end_to_end_custom_args_truncation(
         log_dict = get_dict_from_mock_log_call(
             logger.info.call_args_list[log_index]
         )
+        assert log_dict['entrypoint'] == 'service.get_rpc3'
+        assert len(log_dict['call_args']['redacted_args']) == 100
+        assert log_dict['call_args']['truncated'] is True
+
+    for log_index in [6, 7]:
+        log_dict = get_dict_from_mock_log_call(
+            logger.info.call_args_list[log_index]
+        )
         assert log_dict['entrypoint'] == 'service.send_http1'
         assert log_dict['call_args']['request']['data'] == 'C' * 200
         assert log_dict['call_args']['args'] == '{"arg1": "%s"}' % ('D' * 200)
         assert log_dict['call_args']['truncated'] is False
 
-    for log_index in [6, 7]:
+    for log_index in [8, 9]:
         log_dict = get_dict_from_mock_log_call(
             logger.info.call_args_list[log_index]
         )
@@ -923,6 +963,35 @@ def test_truncate_rpc_args(
         entrypoint_logger.worker_result(rpc_worker_ctx)
 
     request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
+    assert request_log['call_args']['args'] == expected_args
+    assert request_log['call_args']['truncated'] is expected_truncated
+    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
+    assert response_log['call_args']['args'] == expected_args
+    assert response_log['call_args']['truncated'] is expected_truncated
+
+
+@pytest.mark.parametrize(
+    ('max_length', 'expected_truncated', 'expected_args'), [
+        (4, True, '{"pa'),
+        (7, True, '{"passw'),
+        (100, False, '{"password": "********"}'),
+    ]
+)
+def test_truncate_sensitive_rpc_args(
+    entrypoint_logger, sensitive_rpc_worker_ctx,
+    max_length, expected_truncated, expected_args
+):
+    entrypoint_logger.truncated_args_entrypoints = [
+        re.compile('sensitive_rpc_method')
+    ]
+    entrypoint_logger.truncated_args_length = max_length
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        # Call both worker_setup and worker_result as `args` are logged for
+        # both events.
+        entrypoint_logger.worker_setup(sensitive_rpc_worker_ctx)
+        entrypoint_logger.worker_result(sensitive_rpc_worker_ctx)
+
+    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
     assert request_log['call_args']['redacted_args'] == expected_args
     assert request_log['call_args']['truncated'] is expected_truncated
     response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
@@ -938,8 +1007,8 @@ def test_default_json_serializer_will_raise_value_error():
 def test_can_handle_exception_when_getting_worker_data():
     worker_ctx = Mock()
     error_message = "Something went wrong."
-    with patch('nameko_entrypoint_logger.hasattr') as hasattr_mock:
-        hasattr_mock.side_effect = Exception(error_message)
+    with patch('nameko_entrypoint_logger.getattr') as getattr_mock:
+        getattr_mock.side_effect = Exception(error_message)
         data = get_worker_data(worker_ctx)
 
     assert error_message in data['error']

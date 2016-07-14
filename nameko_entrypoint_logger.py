@@ -272,7 +272,7 @@ def get_worker_data(worker_ctx, max_args_length=None):
         provider_name = provider.method_name
         entrypoint = "{}.{}".format(service_name, provider_name)
 
-        if hasattr(provider, 'sensitive_variables'):
+        if getattr(provider, 'sensitive_variables', None):
             redacted_callargs = get_redacted_args(
                 provider, *worker_ctx.args, **worker_ctx.kwargs)
 
