@@ -46,6 +46,13 @@ class Service(object):
     def sensitive_rpc_method(self, password):
         pass
 
+    @rpc(
+        expected_exceptions=CustomException,
+        sensitive_variables=('secret', 'payload.user.password')
+    )
+    def complex_sensitive_rpc_method(self, secret, arg1, payload):
+        pass
+
     @http('GET', '/get/<int:value>')
     def get_method(self, request, value):
         payload = {'value': value}
@@ -363,6 +370,31 @@ def test_will_get_sensitive_rpc_worker_redacted_callargs(
 ):
     data = entrypoint_logger._get_base_worker_data(sensitive_rpc_worker_ctx)
     assert data['call_args']['redacted_args'] == '{"password": "********"}'
+
+
+def test_will_get_complex_sensitive_rpc_worker_redacted_callargs(
+    entrypoint_logger, container
+):
+    entrypoint = get_extension(
+        container, Rpc, method_name="complex_sensitive_rpc_method"
+    )
+    ctx = WorkerContext(
+        container, Service, entrypoint,
+        args=("myscrt", 11, {'user': {'name': 'Fred', 'password': 'mypass'}})
+    )
+    data = entrypoint_logger._get_base_worker_data(ctx)
+
+    assert data['call_args']['truncated'] is False
+    assert json.loads(data['call_args']['redacted_args']) == {
+        "arg1": 11,
+        "payload": {
+            "user": {
+                "password": "********",
+                "name": "Fred"
+            }
+        },
+        "secret": "********",
+    }
 
 
 @pytest.mark.parametrize(
