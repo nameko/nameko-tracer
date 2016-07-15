@@ -293,7 +293,7 @@ def test_requests_from_supported_workers_are_logged(
             for worker_ctx in supported_workers:
                 entrypoint_logger.worker_setup(worker_ctx)
                 (call_args,), _ = logger.info.call_args
-                assert '"timestamp":' in call_args
+                assert '"lifecycle_stage": "request"' in call_args
 
     assert logger.info.call_count == len(supported_workers)
 
@@ -311,7 +311,7 @@ def test_results_from_supported_workers_are_logged(
                 for worker in supported_workers:
                     entrypoint_logger.worker_result(worker)
                     (call_args,), _ = logger.info.call_args
-                    assert '"timestamp":' in call_args
+                    assert '"lifecycle_stage": "response"' in call_args
 
     assert logger.info.call_count == len(supported_workers)
 
@@ -320,7 +320,7 @@ def test_can_get_results_for_supported_workers(
     entrypoint_logger, supported_workers
 ):
     for worker in supported_workers:
-        data = entrypoint_logger._get_base_worker_data(worker, 'test')
+        data = entrypoint_logger._get_base_worker_data(worker)
         assert data['provider'] == type(worker.entrypoint).__name__
         assert data['hostname'] == socket.gethostname()
         assert data['service'] == worker.service_name
@@ -335,7 +335,7 @@ def test_can_get_results_for_supported_workers(
 def test_will_call_get_redacted_callargs(entrypoint_logger, supported_workers):
     with patch('nameko_entrypoint_logger.get_redacted_args') as get_args:
         for worker in supported_workers:
-            entrypoint_logger._get_base_worker_data(worker, 'test')
+            entrypoint_logger._get_base_worker_data(worker)
 
     assert get_args.call_count == 1
 
@@ -343,27 +343,25 @@ def test_will_call_get_redacted_callargs(entrypoint_logger, supported_workers):
 def test_will_call_get_http_request(entrypoint_logger, supported_workers):
     with patch('nameko_entrypoint_logger.get_http_request') as get_request:
         for worker in supported_workers:
-            entrypoint_logger._get_base_worker_data(worker, 'test')
+            entrypoint_logger._get_base_worker_data(worker)
 
     assert get_request.call_count == 1
 
 
 def test_will_get_event_worker_callargs(entrypoint_logger, event_worker_ctx):
-    data = entrypoint_logger._get_base_worker_data(event_worker_ctx, 'test')
+    data = entrypoint_logger._get_base_worker_data(event_worker_ctx)
     assert data['call_args']['args'] == '{"payload": "bar"}'
 
 
 def test_will_get_rpc_worker_callargs(entrypoint_logger, rpc_worker_ctx):
-    data = entrypoint_logger._get_base_worker_data(rpc_worker_ctx, 'test')
+    data = entrypoint_logger._get_base_worker_data(rpc_worker_ctx)
     assert data['call_args']['args'] == '{"foo": "bar"}'
 
 
 def test_will_get_sensitive_rpc_worker_redacted_callargs(
     entrypoint_logger, sensitive_rpc_worker_ctx
 ):
-    data = entrypoint_logger._get_base_worker_data(
-        sensitive_rpc_worker_ctx, 'test'
-    )
+    data = entrypoint_logger._get_base_worker_data(sensitive_rpc_worker_ctx)
     assert data['call_args']['redacted_args'] == '{"password": "********"}'
 
 
@@ -1022,6 +1020,6 @@ def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
     error_message = "Something went wrong."
     with patch('nameko_entrypoint_logger.getattr') as getattr_mock:
         getattr_mock.side_effect = Exception(error_message)
-        data = entrypoint_logger._get_base_worker_data(worker_ctx, 'test')
+        data = entrypoint_logger._get_base_worker_data(worker_ctx)
 
     assert error_message in data['error']

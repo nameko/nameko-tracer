@@ -110,7 +110,7 @@ class EntrypointLogger(DependencyProvider):
             return self.truncated_response_length
         return None
 
-    def _get_base_worker_data(self, worker_ctx, lifecycle_stage):
+    def _get_base_worker_data(self, worker_ctx):
         timestamp = datetime.utcnow()
         try:
             call_args = get_call_args(worker_ctx)
@@ -124,7 +124,6 @@ class EntrypointLogger(DependencyProvider):
 
             return {
                 'timestamp': timestamp,
-                'lifecycle_stage': lifecycle_stage,
                 'provider': type(provider).__name__,
                 'hostname': socket.gethostname(),
                 'service': service_name,
@@ -143,12 +142,17 @@ class EntrypointLogger(DependencyProvider):
         except Exception as exc:
             return {
                 'timestamp': timestamp,
-                'lifecycle_stage': lifecycle_stage,
                 'error': "Error when gathering worker data: {}".format(exc)
             }
 
+    def _get_request_worker_data(self, worker_ctx):
+        data = self._get_base_worker_data(worker_ctx)
+        data['lifecycle_stage'] = 'request'
+        return data
+
     def _get_response_worker_data(self, worker_ctx, result, exc_info):
-        data = self._get_base_worker_data(worker_ctx, 'response')
+        data = self._get_base_worker_data(worker_ctx)
+        data['lifecycle_stage'] = 'response'
         data['response_time'] = self.calculate_response_time(
             data, worker_ctx
         )
@@ -172,7 +176,7 @@ class EntrypointLogger(DependencyProvider):
             if not self.should_log(worker_ctx.entrypoint):
                 return
 
-            data = self._get_base_worker_data(worker_ctx, 'request')
+            data = self._get_request_worker_data(worker_ctx)
             self.logger.info(dumps(data))
 
             self.worker_timestamps[worker_ctx] = data['timestamp']
