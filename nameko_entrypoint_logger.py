@@ -37,7 +37,9 @@ class EntrypointLogger(DependencyProvider):
     )
 
     default_truncated_response_entrypoints = ['^get_|^list_|^query_']
+    default_truncated_args_entrypoints = []
     truncated_response_length = 100
+    truncated_args_length = 100
 
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
@@ -52,6 +54,11 @@ class EntrypointLogger(DependencyProvider):
         self.logger = None
         self.enabled = False
         self.worker_timestamps = WeakKeyDictionary()
+
+    def _compile_truncated_config(self, config, config_name, default):
+        return [
+            re.compile(r) for r in config.get(config_name, default) or []
+        ]
 
     def setup(self):
 
@@ -82,27 +89,94 @@ class EntrypointLogger(DependencyProvider):
 
         self.logger = logger
 
-        truncated_response_entrypoints = config.get(
+        self.truncated_response_entrypoints = self._compile_truncated_config(
+            config,
             'TRUNCATED_RESPONSE_ENTRYPOINTS',
             self.default_truncated_response_entrypoints
         )
-        self.truncated_response_entrypoints = [
-            re.compile(r) for r in truncated_response_entrypoints or []
-        ]
+        self.truncated_args_entrypoints = self._compile_truncated_config(
+            config,
+            'TRUNCATED_ARGS_ENTRYPOINTS',
+            self.default_truncated_args_entrypoints
+        )
+
+    def _max_args_length(self, worker_ctx):
+        if should_truncate(worker_ctx, self.truncated_args_entrypoints):
+            return self.truncated_args_length
+        return None
+
+    def _max_response_length(self, worker_ctx):
+        if should_truncate(worker_ctx, self.truncated_response_entrypoints):
+            return self.truncated_response_length
+        return None
+
+    def _get_base_worker_data(self, worker_ctx):
+        timestamp = datetime.utcnow()
+        try:
+            call_args = get_call_args(worker_ctx)
+            max_args_length = self._max_args_length(worker_ctx)
+            truncate_call_args(call_args, max_args_length)
+
+            provider = worker_ctx.entrypoint
+            service_name = worker_ctx.service_name
+            provider_name = provider.method_name
+            entrypoint = "{}.{}".format(service_name, provider_name)
+
+            return {
+                'timestamp': timestamp,
+                'provider': type(provider).__name__,
+                'hostname': socket.gethostname(),
+                'service': service_name,
+                'provider_name': provider_name,
+                'entrypoint': entrypoint,
+                'call_id': worker_ctx.call_id,
+                'call_stack': worker_ctx.call_id_stack,
+                'context_data': {
+                    'language': worker_ctx.data.get('language'),
+                    'user_id': worker_ctx.data.get('user_id'),
+                    'user_agent': worker_ctx.data.get('user_agent'),
+                },
+                'call_args': call_args,
+
+            }
+        except Exception as exc:
+            return {
+                'timestamp': timestamp,
+                'error': "Error when gathering worker data: {}".format(exc)
+            }
+
+    def _get_request_worker_data(self, worker_ctx):
+        data = self._get_base_worker_data(worker_ctx)
+        data['lifecycle_stage'] = 'request'
+        return data
+
+    def _get_response_worker_data(self, worker_ctx, result, exc_info):
+        data = self._get_base_worker_data(worker_ctx)
+        data['lifecycle_stage'] = 'response'
+        data['response_time'] = self.calculate_response_time(
+            data, worker_ctx
+        )
+
+        if exc_info is None:
+            data['status'] = 'success'
+
+            return_args = get_return_args(result)
+            max_response_length = self._max_response_length(worker_ctx)
+            truncate_return_args(return_args, max_response_length)
+            if return_args:
+                data['return_args'] = return_args
+
+        else:
+            data['status'] = 'error'
+            data['exception'] = get_exception(worker_ctx, exc_info)
+        return data
 
     def worker_setup(self, worker_ctx):
-
         try:
-
             if not self.should_log(worker_ctx.entrypoint):
                 return
 
-            data = get_worker_data(worker_ctx)
-
-            data.update({
-                'lifecycle_stage': 'request'
-            })
-
+            data = self._get_request_worker_data(worker_ctx)
             self.logger.info(dumps(data))
 
             self.worker_timestamps[worker_ctx] = data['timestamp']
@@ -111,42 +185,11 @@ class EntrypointLogger(DependencyProvider):
             log.error(exc)
 
     def worker_result(self, worker_ctx, result=None, exc_info=None):
-
         try:
-
             if not self.should_log(worker_ctx.entrypoint):
                 return
 
-            data = get_worker_data(worker_ctx)
-
-            response_time = self.calculate_response_time(data, worker_ctx)
-
-            data.update({
-                'lifecycle_stage': 'response',
-                'response_time': response_time
-            })
-
-            if exc_info is None:
-                max_response_length = None
-                if should_truncate(
-                    worker_ctx, self.truncated_response_entrypoints
-                ):
-                    max_response_length = self.truncated_response_length
-
-                data['status'] = 'success'
-
-                data.update(
-                    process_response(
-                        result, max_response_length=max_response_length
-                    )
-                )
-            else:
-
-                data['status'] = 'error'
-
-                data.update(
-                    process_exception(worker_ctx, exc_info)
-                )
+            data = self._get_response_worker_data(worker_ctx, result, exc_info)
             self.logger.info(dumps(data))
 
         except Exception as exc:
@@ -241,62 +284,6 @@ def logging_publisher(config):
     return publish
 
 
-def get_worker_data(worker_ctx):
-    data = {
-        'timestamp': datetime.utcnow()
-    }
-
-    try:
-        provider = worker_ctx.entrypoint
-        service_name = worker_ctx.service_name
-        provider_name = provider.method_name
-        entrypoint = "{}.{}".format(service_name, provider_name)
-
-        if hasattr(provider, 'sensitive_variables'):
-            redacted_callargs = get_redacted_args(
-                provider, *worker_ctx.args, **worker_ctx.kwargs)
-
-            call_args = {
-                'redacted_args': to_string(redacted_callargs)
-            }
-
-        else:
-            # TODO: HttpRequestHandler should support sensitive_variables
-            # Also get_redacted_args should be tolerant of
-            # entrypoints that don't define them
-            args = get_entrypoint_call_args(worker_ctx)
-
-            call_args = {}
-
-            if 'request' in args:
-                call_args['request'] = get_http_request(
-                    args.pop('request')
-                )
-
-            call_args['args'] = to_string(safe_for_serialization(args))
-
-        data.update({
-            'provider': type(provider).__name__,
-            'hostname': socket.gethostname(),
-            'service': service_name,
-            'provider_name': provider_name,
-            'entrypoint': entrypoint,
-            'call_id': worker_ctx.call_id,
-            'call_stack': worker_ctx.call_id_stack,
-            'context_data': {
-                'language': worker_ctx.data.get('language'),
-                'user_id': worker_ctx.data.get('user_id'),
-                'user_agent': worker_ctx.data.get('user_agent'),
-            },
-            'call_args': call_args
-        })
-    except Exception as exc:
-        data.update({
-            'error': "Error when gathering worker data: {}".format(exc)
-        })
-    return data
-
-
 def get_entrypoint_call_args(worker_ctx):
     provider = worker_ctx.entrypoint
     method = getattr(provider.container.service_cls, provider.method_name)
@@ -310,43 +297,75 @@ def get_entrypoint_call_args(worker_ctx):
     return call_args
 
 
-def truncate_response(return_args, max_response_length):
+def truncate_call_args(call_args, max_length):
+    call_args['truncated'] = False
+
+    if max_length is not None:
+        request = call_args.get('request')
+
+        checks = [
+            (request, 'data'),
+            (call_args, 'redacted_args'),
+            (call_args, 'args')
+        ]
+
+        for parent, field in checks:
+            if parent and len(parent.get(field) or '') > max_length:
+                parent[field] = parent[field][:max_length]
+                call_args['truncated'] = True
+
+
+def truncate_return_args(return_args, max_length):
     if return_args:
         if (
-            max_response_length is not None and
-            len(return_args['result']) > max_response_length
+            max_length is not None and
+            len(return_args['result']) > max_length
         ):
-            return_args['result'] = return_args['result'][:max_response_length]
+            return_args['result'] = return_args['result'][:max_length]
             return_args['truncated'] = True
         else:
             return_args['truncated'] = False
 
 
-def process_response(result, max_response_length=None):
-    return_args = None
+def get_call_args(worker_ctx):
+    provider = worker_ctx.entrypoint
+    call_args = {}
+    if getattr(provider, 'sensitive_variables', None):
+        redacted_callargs = get_redacted_args(
+            provider, *worker_ctx.args, **worker_ctx.kwargs)
+
+        return {'redacted_args': to_string(redacted_callargs)}
+
+    # TODO: HttpRequestHandler should support sensitive_variables
+    # Also get_redacted_args should be tolerant of
+    # entrypoints that don't define them
+    args = get_entrypoint_call_args(worker_ctx)
+    request = args.pop('request', None)
+
+    call_args = {'args': to_string(safe_for_serialization(args))}
+    if request:
+        call_args['request'] = get_http_request(request)
+    return call_args
+
+
+def get_return_args(result):
     if isinstance(result, Response):
         # spceific case for processing HTTP response
-        return_args = {
+        return {
             'content_type': result.content_type,
             'result': to_string(result.get_data()),
             'status_code': result.status_code,
             'result_bytes': result.content_length,
         }
-    else:
-        # All other responses
-        result_string = to_string(safe_for_serialization(result))
-        if result_string is not None:
-            result_bytes = len(result_string)
-            return_args = {
-                'result_bytes': result_bytes,
-                'result': result_string,
-            }
-
-    truncate_response(return_args, max_response_length)
-    return {'return_args': return_args} if return_args else {}
+    # All other responses
+    result_string = to_string(safe_for_serialization(result))
+    return {
+        'result_bytes': len(result_string),
+        'result': result_string,
+    }
 
 
-def process_exception(worker_ctx, exc_info):
+def get_exception(worker_ctx, exc_info):
     expected_exceptions = getattr(
         worker_ctx.entrypoint, 'expected_exceptions', None
     ) or tuple()  # can have attr set to None
@@ -359,13 +378,10 @@ def process_exception(worker_ctx, exc_info):
         exc_repr = "[exc serialization failed]"
 
     return {
-        'exception': {
-            'exc_type': exc_info[0].__name__,
-            'exc': to_string(exc_repr),
-            'traceback': ''.join(format_tb(exc_info[2])),
-            'expected_error': is_expected,
-        }
-
+        'exc_type': exc_info[0].__name__,
+        'exc': to_string(exc_repr),
+        'traceback': ''.join(format_tb(exc_info[2])),
+        'expected_error': is_expected,
     }
 
 
@@ -405,7 +421,7 @@ def get_environ(environ):
 def to_string(value):
     if isinstance(value, six.string_types):
         return value
-    if isinstance(value, dict):
+    if isinstance(value, (dict, list)):
         return json.dumps(value)
     if isinstance(value, bytes):
         return value.decode("utf-8")
