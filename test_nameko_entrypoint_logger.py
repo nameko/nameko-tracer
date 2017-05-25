@@ -5,7 +5,7 @@ import socket
 from datetime import datetime
 
 import pytest
-# import six
+import six
 from kombu import Exchange, Queue
 from mock import ANY, call, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
@@ -1065,29 +1065,5 @@ def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
 def test_exception_with_cause_is_logged(
     entrypoint_logger, rpc_worker_ctx
 ):
-    try:
-        cause = ValueError('This is the cause.')
-        wrapping_error = Exception("Something went wrong")
-        raise wrapping_error from cause
-        #six.raise_from(wrapping_error, cause)
-    except Exception as e:
-        exc = e
-
-    exc_info = (Exception, exc, exc.__traceback__)
-
-    entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
-
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        entrypoint_logger.worker_result(
-            rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
-        )
-
-    (call_args,), _ = logger.info.call_args
-
-    worker_data = json.loads(call_args)
-
-    assert worker_data['status'] == 'error'
-    assert "Something went wrong" in str(worker_data['exception']['exc'])
-    assert "Something went wrong" in worker_data['exception']['traceback']
-    assert "This is the cause" in worker_data['exception']['traceback']
-    assert "ValueError" in worker_data['exception']['traceback']
+    ppp = six
+    assert ppp
