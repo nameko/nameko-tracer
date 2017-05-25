@@ -1065,5 +1065,30 @@ def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
 def test_exception_with_cause_is_logged(
     entrypoint_logger, rpc_worker_ctx
 ):
-    ppp = six
-    assert ppp
+    try:
+        cause = ValueError('This is the cause.')
+        wrapping_error = Exception("Something went wrong")
+        six.raise_from(wrapping_error, cause)
+    except Exception as e:
+        exc = e
+
+    exc_info = (Exception, exc, exc.__traceback__)
+
+    assert exc_info
+
+    # entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
+
+    # with patch.object(entrypoint_logger, 'logger') as logger:
+    #     entrypoint_logger.worker_result(
+    #         rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
+    #     )
+
+    # (call_args,), _ = logger.info.call_args
+
+    # worker_data = json.loads(call_args)
+
+    # assert worker_data['status'] == 'error'
+    # assert "Something went wrong" in str(worker_data['exception']['exc'])
+    # assert "Something went wrong" in worker_data['exception']['traceback']
+    # assert "This is the cause" in worker_data['exception']['traceback']
+    # assert "ValueError" in worker_data['exception']['traceback']
