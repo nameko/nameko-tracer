@@ -1088,7 +1088,7 @@ def test_exception_with_cause_is_logged(
     worker_data = json.loads(call_args)
     assert worker_data
 
-    # assert worker_data['status'] == 'error'
+    assert worker_data['status'] == 'error'
     # assert "Something went wrong" in str(worker_data['exception']['exc'])
     # assert "Something went wrong" in worker_data['exception']['traceback']
     # assert "This is the cause" in worker_data['exception']['traceback']
