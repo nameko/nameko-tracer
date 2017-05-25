@@ -648,6 +648,7 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     assert worker_data['exception']['traceback'] == '[format_exception failed]'
 
 
+
 def test_end_to_end(container_factory, config, http_request):
     class TestService(object):
         name = "service"
@@ -802,6 +803,8 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc3_response['return_args']['result_bytes'] == 200
     assert get_rpc3_response['return_args']['result'] == 'C' * 100
     assert get_rpc3_response['return_args']['truncated'] is True
+
+    container.stop()
 
 
 def test_end_to_end_custom_args_truncation(
