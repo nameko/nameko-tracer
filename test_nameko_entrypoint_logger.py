@@ -1085,10 +1085,10 @@ def test_exception_with_cause_is_logged(
 
     (call_args,), _ = logger.info.call_args
 
-    # worker_data = json.loads(call_args)
+    worker_data = json.loads(call_args)
 
-    # assert worker_data['status'] == 'error'
-    # assert "Something went wrong" in str(worker_data['exception']['exc'])
-    # assert "Something went wrong" in worker_data['exception']['traceback']
-    # assert "This is the cause" in worker_data['exception']['traceback']
-    # assert "ValueError" in worker_data['exception']['traceback']
+    assert worker_data['status'] == 'error'
+    assert "Something went wrong" in str(worker_data['exception']['exc'])
+    assert "Something went wrong" in worker_data['exception']['traceback']
+    assert "This is the cause" in worker_data['exception']['traceback']
+    assert "ValueError" in worker_data['exception']['traceback']
