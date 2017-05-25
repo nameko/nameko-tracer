@@ -12,7 +12,6 @@ setup(
     py_modules=['nameko_entrypoint_logger'],
     install_requires=[
         "nameko>=2.2.0",
-        "eventlet==0.20.1",
     ],
     extras_require={
         'dev': [
