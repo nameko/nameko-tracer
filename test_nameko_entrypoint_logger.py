@@ -1076,14 +1076,14 @@ def test_exception_with_cause_is_logged(
 
     assert exc_info
 
-    # entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
+    entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
 
-    # with patch.object(entrypoint_logger, 'logger') as logger:
-    #     entrypoint_logger.worker_result(
-    #         rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
-    #     )
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(
+            rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
+        )
 
-    # (call_args,), _ = logger.info.call_args
+    (call_args,), _ = logger.info.call_args
 
     # worker_data = json.loads(call_args)
 
