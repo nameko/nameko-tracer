@@ -5,7 +5,7 @@ import socket
 from datetime import datetime
 
 import pytest
-import six
+# import six
 from kombu import Exchange, Queue
 from mock import ANY, call, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
@@ -1068,7 +1068,8 @@ def test_exception_with_cause_is_logged(
     try:
         cause = ValueError('This is the cause.')
         wrapping_error = Exception("Something went wrong")
-        six.raise_from(wrapping_error, cause)
+        raise wrapping_error from cause
+        #six.raise_from(wrapping_error, cause)
     except Exception as e:
         exc = e
 
