@@ -8,6 +8,7 @@ import pytest
 import six
 from kombu import Exchange, Queue
 from mock import ANY, call, MagicMock, Mock, patch
+from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
 from nameko.exceptions import ConfigurationError
@@ -71,8 +72,9 @@ class Service(object):
 
 
 @pytest.fixture
-def config(web_config, rabbit_config):
+def config(web_config):
     config = {
+        AMQP_URI_CONFIG_KEY: 'memory://dev',
         'ENTRYPOINT_LOGGING': {
             'ENABLED': True,
             'AMQP_URI': 'memory://dev',
@@ -83,7 +85,6 @@ def config(web_config, rabbit_config):
         }
     }
     config.update(web_config)
-    config.update(rabbit_config)
     return config
 
 
@@ -676,9 +677,7 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     logger = get_extension(container, EntrypointLogger)
 
     with patch.object(logger, 'logger') as logger:
-        # invoke all the service methods
-        method_names = ['rpc_method', 'get_rpc', 'list_rpc', 'query_rpc']
-        for meth_name in method_names:
+        for meth_name in ['rpc_method', 'get_rpc', 'list_rpc', 'query_rpc']:
             with entrypoint_hook(container, meth_name) as rpc_meth:
                 with entrypoint_waiter(container, meth_name):
                     rpc_meth()
@@ -868,8 +867,7 @@ def test_end_to_end_custom_args_truncation(
         )
         assert log_dict['entrypoint'] == 'service.send_http1'
         assert log_dict['call_args']['request']['data'] == 'C' * 200
-        assert log_dict['call_args']['args'] == (
-            '{"arg1": "%s"}' % ('D' * 200))
+        assert log_dict['call_args']['args'] == '{"arg1": "%s"}' % ('D' * 200)
         assert log_dict['call_args']['truncated'] is False
 
     for log_index in [8, 9]:
