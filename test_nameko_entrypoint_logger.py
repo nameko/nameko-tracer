@@ -4,6 +4,7 @@ import re
 import socket
 from datetime import datetime
 
+import eventlet
 import pytest
 import six
 from kombu import Exchange, Queue
@@ -646,6 +647,9 @@ def test_end_to_end(container_factory, config, http_request):
                 http_method(http_request)
         assert logger.info.call_count == 4
 
+    container.stop()
+    eventlet.sleep(2)
+
 
 def test_end_to_end_default_response_truncation(container_factory, config):
     class TestService(object):
@@ -712,6 +716,9 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     )
     assert query_rpc_response['return_args']['truncated'] is True
 
+    container.stop()
+    eventlet.sleep(2)
+
 
 def test_end_to_end_custom_response_truncation(container_factory, config):
     class TestService(object):
@@ -770,6 +777,9 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc3_response['return_args']['result_bytes'] == 200
     assert get_rpc3_response['return_args']['result'] == 'C' * 100
     assert get_rpc3_response['return_args']['truncated'] is True
+
+    container.stop()
+    eventlet.sleep(2)
 
 
 def test_end_to_end_custom_args_truncation(
@@ -877,6 +887,9 @@ def test_end_to_end_custom_args_truncation(
         assert log_dict['call_args']['request']['data'] == 'E' * 100
         assert log_dict['call_args']['args'] == '{"arg1": "%s' % ('F' * 90)
         assert log_dict['call_args']['truncated'] is True
+
+    container.stop()
+    eventlet.sleep(2)
 
 
 @pytest.mark.parametrize(
