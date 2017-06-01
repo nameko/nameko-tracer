@@ -4,7 +4,6 @@ import re
 import socket
 from datetime import datetime
 
-import eventlet
 import pytest
 import six
 from kombu import Exchange, Queue
@@ -648,7 +647,6 @@ def test_end_to_end(container_factory, config, http_request):
         assert logger.info.call_count == 4
 
     container.stop()
-    eventlet.sleep(2)
 
 
 def test_end_to_end_default_response_truncation(container_factory, config):
@@ -717,7 +715,6 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     assert query_rpc_response['return_args']['truncated'] is True
 
     container.stop()
-    eventlet.sleep(2)
 
 
 def test_end_to_end_custom_response_truncation(container_factory, config):
@@ -779,7 +776,6 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc3_response['return_args']['truncated'] is True
 
     container.stop()
-    eventlet.sleep(2)
 
 
 def test_end_to_end_custom_args_truncation(
@@ -889,7 +885,6 @@ def test_end_to_end_custom_args_truncation(
         assert log_dict['call_args']['truncated'] is True
 
     container.stop()
-    eventlet.sleep(2)
 
 
 @pytest.mark.parametrize(
