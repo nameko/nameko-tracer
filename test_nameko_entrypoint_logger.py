@@ -5,6 +5,7 @@ import socket
 from datetime import datetime
 
 import pytest
+import six
 from kombu import Exchange, Queue
 from mock import ANY, call, MagicMock, Mock, patch
 from nameko.constants import AMQP_URI_CONFIG_KEY
@@ -71,8 +72,8 @@ class Service(object):
 
 
 @pytest.fixture
-def config():
-    return {
+def config(web_config):
+    config = {
         AMQP_URI_CONFIG_KEY: 'memory://dev',
         'ENTRYPOINT_LOGGING': {
             'ENABLED': True,
@@ -83,6 +84,8 @@ def config():
             'CONTENT_TYPE': 'application/json'
         }
     }
+    config.update(web_config)
+    return config
 
 
 @pytest.fixture
@@ -612,6 +615,7 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
     worker_data = json.loads(call_args)
 
     assert worker_data['exception']['exc'] == '[exc serialization failed]'
+    assert worker_data['exception']['traceback'] == '[format_exception failed]'
 
 
 def test_end_to_end(container_factory, config, http_request):
@@ -673,7 +677,6 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     logger = get_extension(container, EntrypointLogger)
 
     with patch.object(logger, 'logger') as logger:
-        # invoke all the service methods
         for meth_name in ['rpc_method', 'get_rpc', 'list_rpc', 'query_rpc']:
             with entrypoint_hook(container, meth_name) as rpc_meth:
                 with entrypoint_waiter(container, meth_name):
@@ -1055,3 +1058,32 @@ def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
         data = entrypoint_logger._get_base_worker_data(worker_ctx)
 
     assert error_message in data['error']
+
+
+def test_exception_with_cause_is_logged(
+    entrypoint_logger, rpc_worker_ctx
+):
+    try:
+        cause = ValueError('This is the cause.')
+        wrapping_error = Exception("Something went wrong")
+        six.raise_from(wrapping_error, cause)
+    except Exception as e:
+        exc = e
+
+    exc_info = (Exception, exc, exc.__traceback__)
+
+    assert exc_info
+
+    entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
+
+    with patch.object(entrypoint_logger, 'logger') as logger:
+        entrypoint_logger.worker_result(
+            rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
+        )
+
+    (call_args,), _ = logger.info.call_args
+
+    worker_data = json.loads(call_args)
+
+    assert "Something went wrong" in worker_data['exception']['traceback']
+    assert "This is the cause" in worker_data['exception']['traceback']

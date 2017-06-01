@@ -4,7 +4,7 @@ import logging
 import re
 import socket
 from datetime import datetime
-from traceback import format_tb
+from traceback import format_exception
 from weakref import WeakKeyDictionary
 
 import six
@@ -377,10 +377,15 @@ def get_exception(worker_ctx, exc_info):
     except Exception:
         exc_repr = "[exc serialization failed]"
 
+    try:
+        exc_traceback = ''.join(format_exception(*exc_info))
+    except Exception:
+        exc_traceback = "[format_exception failed]"
+
     return {
         'exc_type': exc_info[0].__name__,
         'exc': to_string(exc_repr),
-        'traceback': ''.join(format_tb(exc_info[2])),
+        'traceback': exc_traceback,
         'expected_error': is_expected,
     }
 
