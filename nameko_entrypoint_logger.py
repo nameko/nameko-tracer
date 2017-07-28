@@ -180,7 +180,7 @@ class EntrypointLogger(DependencyProvider):
                 return
 
             data = self._get_request_worker_data(worker_ctx)
-            self.logger.info(dumps(data))
+            self.logger.info('entrypoint request', extra={'data': data})
 
             self.worker_timestamps[worker_ctx] = data['timestamp']
 
@@ -193,7 +193,7 @@ class EntrypointLogger(DependencyProvider):
                 return
 
             data = self._get_response_worker_data(worker_ctx, result, exc_info)
-            self.logger.info(dumps(data))
+            self.logger.info('entrypoint response', extra={'data': data})
 
         except Exception as exc:
             log.error(exc)
@@ -205,6 +205,12 @@ class EntrypointLogger(DependencyProvider):
 
     def should_log(self, entrypoint):
         return self.enabled and isinstance(entrypoint, self.entrypoint_types)
+
+
+class JSONFormatter(logging.Formatter):
+
+    def format(self, record):
+        return dumps(record.data)
 
 
 class EntrypointLoggingHandler(logging.Handler):

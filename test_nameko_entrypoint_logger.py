@@ -191,7 +191,8 @@ def dummy_worker_ctx(mock_container):
 
 
 def get_dict_from_mock_log_call(log_call):
-    return json.loads(log_call[0][0])
+    _, kwargs = log_call
+    return kwargs['extra']['data']
 
 
 def test_setup(entrypoint_logger):
@@ -331,8 +332,10 @@ def test_requests_from_supported_workers_are_logged(
             data.return_value = {'timestamp': datetime.utcnow()}
             for worker_ctx in supported_workers:
                 entrypoint_logger.worker_setup(worker_ctx)
-                (call_args,), _ = logger.info.call_args
-                assert '"lifecycle_stage": "request"' in call_args
+                _, kwargs = logger.info.call_args
+                assert (
+                    kwargs['extra']['data']['lifecycle_stage'] ==
+                    'request')
 
     assert logger.info.call_count == len(supported_workers)
 
@@ -349,8 +352,10 @@ def test_results_from_supported_workers_are_logged(
                 response_time.return_value = 0.001
                 for worker in supported_workers:
                     entrypoint_logger.worker_result(worker)
-                    (call_args,), _ = logger.info.call_args
-                    assert '"lifecycle_stage": "response"' in call_args
+                    _, kwargs = logger.info.call_args
+                    assert (
+                        kwargs['extra']['data']['lifecycle_stage'] ==
+                        'response')
 
     assert logger.info.call_count == len(supported_workers)
 
@@ -596,9 +601,11 @@ def test_unexpected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
             rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
         )
 
-    (call_args,), _ = logger.info.call_args
+    args, kwargs = logger.info.call_args
 
-    worker_data = json.loads(call_args)
+    worker_data = kwargs['extra']['data']
+
+    assert args[0] == 'entrypoint response'
 
     assert worker_data['provider'] == "Rpc"
     assert worker_data['exception']['expected_error'] is False
@@ -617,9 +624,11 @@ def test_expected_exception_is_logged(entrypoint_logger, rpc_worker_ctx):
             rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
         )
 
-    (call_args,), _ = logger.info.call_args
+    args, kwargs = logger.info.call_args
 
-    worker_data = json.loads(call_args)
+    worker_data = kwargs['extra']['data']
+
+    assert args[0] == 'entrypoint response'
 
     assert worker_data['provider'] == "Rpc"
     assert worker_data['exception']['expected_error'] is True
@@ -639,9 +648,11 @@ def test_can_handle_failed_exception_repr(entrypoint_logger, rpc_worker_ctx):
             rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
         )
 
-    (call_args,), _ = logger.info.call_args
+    args, kwargs = logger.info.call_args
 
-    worker_data = json.loads(call_args)
+    worker_data = kwargs['extra']['data']
+
+    assert args[0] == 'entrypoint response'
 
     assert worker_data['exception']['exc'] == '[exc serialization failed]'
     assert worker_data['exception']['traceback'] == '[format_exception failed]'
@@ -1110,9 +1121,12 @@ def test_exception_with_cause_is_logged(
             rpc_worker_ctx, result={'bar': 'foo'}, exc_info=exc_info
         )
 
-    (call_args,), _ = logger.info.call_args
+    args, kwargs = logger.info.call_args
 
-    worker_data = json.loads(call_args)
+    message = args[0]
+    worker_data = kwargs['extra']['data']
+
+    assert message == 'entrypoint response'
 
     assert "Something went wrong" in worker_data['exception']['traceback']
     assert "This is the cause" in worker_data['exception']['traceback']
