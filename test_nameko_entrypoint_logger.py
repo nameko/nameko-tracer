@@ -18,8 +18,9 @@ from nameko.rpc import Rpc, rpc
 from nameko.testing.services import entrypoint_hook, entrypoint_waiter
 from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
-from nameko_entrypoint_logger import (
-    EntrypointLogger, EntrypointLoggingHandler, dumps, get_http_request,
+from nameko_entrypoint_logger import EntrypointLogger
+from nameko_entrypoint_logger.dependency import (
+    EntrypointLoggingHandler, dumps, get_http_request,
     logging_publisher, get_return_args, should_truncate)
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
@@ -236,7 +237,7 @@ def test_missing_config(mock_container):
     mock_container.config = {}
     dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
 
-    with patch('nameko_entrypoint_logger.log') as log:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
         dependency_provider.setup()
 
     calls = [call('EntrypointLogger is disabled')]
@@ -249,7 +250,7 @@ def test_disabled_by_config(mock_container, config):
     mock_container.config = config
     dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
 
-    with patch('nameko_entrypoint_logger.log') as log:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
         dependency_provider.setup()
 
     calls = [call('EntrypointLogger is disabled')]
@@ -262,7 +263,7 @@ def test_disabled_by_config_explicitly(mock_container, config):
     mock_container.config = config
     dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
 
-    with patch('nameko_entrypoint_logger.log') as log:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
         dependency_provider.setup()
 
     calls = [call('EntrypointLogger is disabled')]
@@ -377,7 +378,7 @@ def test_can_get_results_for_supported_workers(
 
 
 def test_will_call_get_redacted_callargs(entrypoint_logger, supported_workers):
-    with patch('nameko_entrypoint_logger.get_redacted_args') as get_args:
+    with patch('nameko_entrypoint_logger.dependency.get_redacted_args') as get_args:
         for worker in supported_workers:
             entrypoint_logger._get_base_worker_data(worker)
 
@@ -385,7 +386,7 @@ def test_will_call_get_redacted_callargs(entrypoint_logger, supported_workers):
 
 
 def test_will_call_get_http_request(entrypoint_logger, supported_workers):
-    with patch('nameko_entrypoint_logger.get_http_request') as get_request:
+    with patch('nameko_entrypoint_logger.dependency.get_http_request') as get_request:
         for worker in supported_workers:
             entrypoint_logger._get_base_worker_data(worker)
 
@@ -538,7 +539,7 @@ def test_event_dispatcher_will_publish_logs(config):
 
     message = {'foo': 'bar'}
 
-    with patch('nameko_entrypoint_logger.producers') as mock_producers:
+    with patch('nameko_entrypoint_logger.dependency.producers') as mock_producers:
         with mock_producers[ANY].acquire(block=True) as mock_producer:
             publisher(json.dumps(message))
 
@@ -557,8 +558,8 @@ def test_event_dispatcher_will_publish_logs(config):
 def test_event_dispatcher_will_swallow_exception(config):
     publisher = logging_publisher(config)
 
-    with patch('nameko_entrypoint_logger.log') as log:
-        with patch('nameko_entrypoint_logger.producers') as producers:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
+        with patch('nameko_entrypoint_logger.dependency.producers') as producers:
             with producers[ANY].acquire(block=True) as producer:
                 producer.publish.side_effect = BrokenPipeError(32, 'Oops')
                 publisher({})
@@ -570,7 +571,7 @@ def test_worker_setup_will_swallow_exceptions(
         entrypoint_logger, http_worker_ctx
 ):
     exception = Exception("Boom")
-    with patch('nameko_entrypoint_logger.log') as log:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
         with patch.object(entrypoint_logger, '_get_base_worker_data') as gbwd:
             gbwd.side_effect = exception
             entrypoint_logger.worker_setup(http_worker_ctx)
@@ -582,7 +583,7 @@ def test_worker_results_will_swallow_exceptions(
         entrypoint_logger, http_worker_ctx
 ):
     exception = Exception("Boom")
-    with patch('nameko_entrypoint_logger.log') as log:
+    with patch('nameko_entrypoint_logger.dependency.log') as log:
         with patch.object(entrypoint_logger, '_get_base_worker_data') as gbwd:
             gbwd.side_effect = exception
             entrypoint_logger.worker_result(http_worker_ctx)
@@ -1093,7 +1094,7 @@ def test_default_json_serializer_will_raise_value_error():
 def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
     worker_ctx = Mock()
     error_message = "Something went wrong."
-    with patch('nameko_entrypoint_logger.getattr') as getattr_mock:
+    with patch('nameko_entrypoint_logger.dependency.getattr') as getattr_mock:
         getattr_mock.side_effect = Exception(error_message)
         data = entrypoint_logger._get_base_worker_data(worker_ctx)
 
