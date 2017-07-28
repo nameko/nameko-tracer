@@ -20,7 +20,7 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import EntrypointLogger
 from nameko_entrypoint_logger.dependency import (
-    EntrypointLoggingHandler, dumps, get_http_request,
+    EntrypointLoggingHandler, get_http_request,
     logging_publisher, get_return_args, should_truncate)
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
@@ -1084,11 +1084,6 @@ def test_truncate_sensitive_rpc_args(
     response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
     assert response_log['call_args']['redacted_args'] == expected_args
     assert response_log['call_args']['truncated'] is expected_truncated
-
-
-def test_default_json_serializer_will_raise_value_error():
-    with pytest.raises(ValueError):
-        dumps({'weird_value': {None}})
 
 
 def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):

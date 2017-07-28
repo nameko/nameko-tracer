@@ -20,6 +20,9 @@ from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
 from werkzeug.wrappers import Response
 
+from nameko_entrypoint_logger.formatters import JSONFormatter
+
+
 log = logging.getLogger(__name__)
 
 
@@ -207,12 +210,6 @@ class EntrypointLogger(DependencyProvider):
         return self.enabled and isinstance(entrypoint, self.entrypoint_types)
 
 
-class JSONFormatter(logging.Formatter):
-
-    def format(self, record):
-        return dumps(record.data)
-
-
 class EntrypointLoggingHandler(logging.Handler):
     def __init__(self, publisher):
         self.publisher = publisher
@@ -220,21 +217,6 @@ class EntrypointLoggingHandler(logging.Handler):
 
     def emit(self, message):
         self.publisher(message.getMessage())
-
-
-def default(obj):
-    """Default JSON serializer.
-
-    :Parameters:
-        obj: Might be a datetime
-    """
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise ValueError
-
-
-def dumps(obj):
-    return json.dumps(obj, default=default)
 
 
 def logging_publisher(config):
