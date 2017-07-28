@@ -1,5 +1,6 @@
 import json
 import logging
+import logging.config
 import re
 import socket
 from datetime import datetime
@@ -201,6 +202,34 @@ def test_setup(entrypoint_logger):
     assert EXCHANGE_NAME in str(entrypoint_logger.container.config)
     assert ROUTING_KEY in str(entrypoint_logger.container.config)
 
+
+def test_setup_with_custom_logger(config, container):
+
+    config['LOGGING'] = {
+        'version': 1,
+        'handlers': {
+            'console': {'class': 'logging.StreamHandler'},
+        },
+        'root': {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+        },
+        'loggers': {
+            'entrypoint_logger': {
+                'level': 'DEBUG',
+                'handlers': ['console'],
+            },
+        },
+    }
+    logging.config.dictConfig(config['LOGGING'])
+
+    entrypoint_logger = get_extension(container, EntrypointLogger)
+
+    entrypoint_logger.setup()
+
+    assert (
+        [type(handler) for handler in entrypoint_logger.logger.handlers] ==
+        [logging.StreamHandler])
 
 def test_missing_config(mock_container):
     mock_container.config = {}

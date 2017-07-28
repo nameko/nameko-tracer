@@ -76,16 +76,19 @@ class EntrypointLogger(DependencyProvider):
                 )
 
         logger = logging.getLogger('entrypoint_logger')
-        logger.setLevel(logging.INFO)
-        logger.propagate = self.propagate
-
-        publisher = logging_publisher(
-            self.container.config
-        )
-        handler = EntrypointLoggingHandler(publisher)
-        formatter = logging.Formatter('%(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        if logger.level == logging.NOTSET:
+            logger.setLevel(logging.INFO)
+        if logger.propagate:
+            logger.propagate = self.propagate
+        if not logger.handlers:
+            publisher = logging_publisher(
+                self.container.config
+            )
+            handler = EntrypointLoggingHandler(publisher)
+            #formatter = logging.Formatter('%(message)s')
+            formatter = JSONFormatter()
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
 
         self.logger = logger
 
