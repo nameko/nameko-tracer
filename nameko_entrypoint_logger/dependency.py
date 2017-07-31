@@ -17,6 +17,10 @@ from nameko.utils import get_redacted_args
 from nameko.web.handlers import HttpRequestHandler
 from werkzeug.wrappers import Response
 
+from nameko_entrypoint_logger.filters import (
+    TruncateRequestFilter,
+    TruncateResponseFilter,
+)
 from nameko_entrypoint_logger.formatters import JSONFormatter
 from nameko_entrypoint_logger.handlers import PublisherHandler, logging_publisher
 
@@ -37,11 +41,6 @@ class EntrypointLogger(DependencyProvider):
         'ROUTING_KEY'
     )
 
-    default_truncated_response_entrypoints = ['^get_|^list_|^query_']
-    default_truncated_args_entrypoints = []
-    truncated_response_length = 100
-    truncated_args_length = 100
-
     entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
 
     def __init__(self, propagate=False):
@@ -55,11 +54,6 @@ class EntrypointLogger(DependencyProvider):
         self.logger = None
         self.enabled = False
         self.worker_timestamps = WeakKeyDictionary()
-
-    def _compile_truncated_config(self, config, config_name, default):
-        return [
-            re.compile(r) for r in config.get(config_name, default) or []
-        ]
 
     def setup(self):
 
@@ -88,38 +82,19 @@ class EntrypointLogger(DependencyProvider):
             handler = PublisherHandler(publisher)
             #formatter = logging.Formatter('%(message)s')
             formatter = JSONFormatter()
+            request_filter = TruncateRequestFilter()
+            response_filter = TruncateResponseFilter()
             handler.setFormatter(formatter)
+            logger.addFilter(request_filter)
+            logger.addFilter(response_filter)
             logger.addHandler(handler)
 
         self.logger = logger
-
-        self.truncated_response_entrypoints = self._compile_truncated_config(
-            config,
-            'TRUNCATED_RESPONSE_ENTRYPOINTS',
-            self.default_truncated_response_entrypoints
-        )
-        self.truncated_args_entrypoints = self._compile_truncated_config(
-            config,
-            'TRUNCATED_ARGS_ENTRYPOINTS',
-            self.default_truncated_args_entrypoints
-        )
-
-    def _max_args_length(self, worker_ctx):
-        if should_truncate(worker_ctx, self.truncated_args_entrypoints):
-            return self.truncated_args_length
-        return None
-
-    def _max_response_length(self, worker_ctx):
-        if should_truncate(worker_ctx, self.truncated_response_entrypoints):
-            return self.truncated_response_length
-        return None
 
     def _get_base_worker_data(self, worker_ctx):
         timestamp = datetime.utcnow()
         try:
             call_args = get_call_args(worker_ctx)
-            max_args_length = self._max_args_length(worker_ctx)
-            truncate_call_args(call_args, max_args_length)
 
             provider = worker_ctx.entrypoint
             service_name = worker_ctx.service_name
@@ -165,8 +140,6 @@ class EntrypointLogger(DependencyProvider):
             data['status'] = 'success'
 
             return_args = get_return_args(result)
-            max_response_length = self._max_response_length(worker_ctx)
-            truncate_return_args(return_args, max_response_length)
             if return_args:
                 data['return_args'] = return_args
 
@@ -219,36 +192,6 @@ def get_entrypoint_call_args(worker_ctx):
     del call_args['self']
 
     return call_args
-
-
-def truncate_call_args(call_args, max_length):
-    call_args['truncated'] = False
-
-    if max_length is not None:
-        request = call_args.get('request')
-
-        checks = [
-            (request, 'data'),
-            (call_args, 'redacted_args'),
-            (call_args, 'args')
-        ]
-
-        for parent, field in checks:
-            if parent and len(parent.get(field) or '') > max_length:
-                parent[field] = parent[field][:max_length]
-                call_args['truncated'] = True
-
-
-def truncate_return_args(return_args, max_length):
-    if return_args:
-        if (
-            max_length is not None and
-            len(return_args['result']) > max_length
-        ):
-            return_args['result'] = return_args['result'][:max_length]
-            return_args['truncated'] = True
-        else:
-            return_args['truncated'] = False
 
 
 def get_call_args(worker_ctx):
@@ -354,8 +297,3 @@ def to_string(value):
         return json.dumps(value)
     if isinstance(value, bytes):
         return value.decode("utf-8")
-
-
-def should_truncate(worker_ctx, truncated_entrypoints):
-    entrypoint_name = worker_ctx.entrypoint.method_name
-    return any(regex.match(entrypoint_name) for regex in truncated_entrypoints)

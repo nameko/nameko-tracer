@@ -20,7 +20,7 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import EntrypointLogger
 from nameko_entrypoint_logger.dependency import (
-    get_http_request, get_return_args, should_truncate)
+    get_http_request, get_return_args)
 from nameko_entrypoint_logger.handlers import PublisherHandler, logging_publisher
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
@@ -421,7 +421,6 @@ def test_will_get_complex_sensitive_rpc_worker_redacted_callargs(
     )
     data = entrypoint_logger._get_base_worker_data(ctx)
 
-    assert data['call_args']['truncated'] is False
     assert json.loads(data['call_args']['redacted_args']) == {
         "arg1": 11,
         "payload": {
@@ -472,27 +471,6 @@ def test_can_get_return_args(
         assert return_args['status_code'] == status_code
     if content_type is not None:
         assert return_args['content_type'] == content_type
-
-
-@pytest.mark.parametrize(
-    'result', [
-        {'foo': 'bar'},
-        Response(json.dumps({'foo': 'bar'}), mimetype='application/json'),
-    ]
-)
-def test_can_process_truncated_result(
-    entrypoint_logger, rpc_worker_ctx, result
-):
-    entrypoint_logger.truncated_response_length = 5
-    entrypoint_logger.truncated_response_entrypoints = [re.compile('')]
-    entrypoint_logger.worker_timestamps[rpc_worker_ctx] = datetime.utcnow()
-
-    response = entrypoint_logger._get_response_worker_data(
-        rpc_worker_ctx, result, None
-    )
-    assert response['return_args']['result_bytes'] == 14
-    assert response['return_args']['result'] == '{"foo'
-    assert response['return_args']['truncated'] is True
 
 
 @pytest.mark.parametrize('data,serialized_data,content_type', [
@@ -676,6 +654,7 @@ def test_end_to_end(container_factory, config, http_request):
         assert logger.info.call_count == 4
 
 
+@pytest.mark.skip(reason='Refactoring - moving truncation to filters')
 def test_end_to_end_default_response_truncation(container_factory, config):
     class TestService(object):
         name = "service"
@@ -741,6 +720,7 @@ def test_end_to_end_default_response_truncation(container_factory, config):
     assert query_rpc_response['return_args']['truncated'] is True
 
 
+@pytest.mark.skip(reason='Refactoring - moving truncation to filters')
 def test_end_to_end_custom_response_truncation(container_factory, config):
     class TestService(object):
         name = "service"
@@ -800,6 +780,7 @@ def test_end_to_end_custom_response_truncation(container_factory, config):
     assert get_rpc3_response['return_args']['truncated'] is True
 
 
+@pytest.mark.skip(reason='Refactoring - moving truncation to filters')
 def test_end_to_end_custom_args_truncation(
     container_factory, config, http_request
 ):
@@ -905,171 +886,6 @@ def test_end_to_end_custom_args_truncation(
         assert log_dict['call_args']['request']['data'] == 'E' * 100
         assert log_dict['call_args']['args'] == '{"arg1": "%s' % ('F' * 90)
         assert log_dict['call_args']['truncated'] is True
-
-
-@pytest.mark.parametrize(
-    ('trunc_value', 'expected'), [
-        (None, []),
-        ([], []),
-        ("", []),
-        (['a', 'b'], [re.compile('a'), re.compile('b')]),
-    ]
-)
-def test_truncated_response_config(
-    mock_container, config, trunc_value, expected
-):
-    custom_config = {}
-    custom_config.update(config)
-    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_RESPONSE_ENTRYPOINTS'] = (
-        trunc_value
-    )
-    mock_container.config = custom_config
-    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
-    dependency_provider.setup()
-    assert dependency_provider.truncated_response_entrypoints == expected
-
-
-def test_truncated_response_default_config(mock_container, config):
-    assert 'TRUNCATED_RESPONSE_ENTRYPOINTS' not in config['ENTRYPOINT_LOGGING']
-
-    mock_container.config = config
-    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
-    dependency_provider.setup()
-    assert dependency_provider.truncated_response_entrypoints == [
-        re.compile('^get_|^list_|^query_')
-    ]
-
-
-@pytest.mark.parametrize(
-    ('trunc_value', 'expected'), [
-        (None, []),
-        ([], []),
-        ("", []),
-        (['a', 'b'], [re.compile('a'), re.compile('b')]),
-    ]
-)
-def test_truncated_args_config(
-    mock_container, config, trunc_value, expected
-):
-    custom_config = {}
-    custom_config.update(config)
-    custom_config['ENTRYPOINT_LOGGING']['TRUNCATED_ARGS_ENTRYPOINTS'] = (
-        trunc_value
-    )
-    mock_container.config = custom_config
-    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
-    dependency_provider.setup()
-    assert dependency_provider.truncated_args_entrypoints == expected
-
-
-def test_truncated_args_default_config(mock_container, config):
-    assert 'TRUNCATED_ARGS_ENTRYPOINTS' not in config['ENTRYPOINT_LOGGING']
-
-    mock_container.config = config
-    dependency_provider = EntrypointLogger().bind(mock_container, 'logger')
-    dependency_provider.setup()
-    assert dependency_provider.truncated_args_entrypoints == []
-
-
-@pytest.mark.parametrize(
-    ('truncated_entrypoints', 'expected'), [
-        ([re.compile('foo')], False),
-        ([re.compile('foo'), re.compile('rpc_method')], True),
-        ([re.compile('rpc_method'), re.compile('foo')], True),
-    ]
-)
-def test_should_truncate(rpc_worker_ctx, truncated_entrypoints, expected):
-    result = should_truncate(rpc_worker_ctx, truncated_entrypoints)
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    ('max_length', 'expected_truncated', 'expected_args', 'expected_data'), [
-        (4, True, '{"va', '{"fo'),
-        (7, True, '{"value', '{"foo":'),
-        (100, False, '{"value": "1"}', '{"foo": "bar"}'),
-    ]
-)
-def test_truncate_http_args(
-    entrypoint_logger, http_worker_ctx,
-    max_length, expected_truncated, expected_args, expected_data
-):
-    entrypoint_logger.truncated_args_entrypoints = [
-        re.compile('get_method')
-    ]
-    entrypoint_logger.truncated_args_length = max_length
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        # Call both worker_setup and worker_result as `args` are logged for
-        # both events.
-        entrypoint_logger.worker_setup(http_worker_ctx)
-        entrypoint_logger.worker_result(http_worker_ctx)
-
-    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
-    assert request_log['call_args']['request']['data'] == expected_data
-    assert request_log['call_args']['args'] == expected_args
-    assert request_log['call_args']['truncated'] is expected_truncated
-    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
-    assert response_log['call_args']['request']['data'] == expected_data
-    assert response_log['call_args']['args'] == expected_args
-    assert response_log['call_args']['truncated'] is expected_truncated
-
-
-@pytest.mark.parametrize(
-    ('max_length', 'expected_truncated', 'expected_args'), [
-        (4, True, '{"fo'),
-        (7, True, '{"foo":'),
-        (100, False, '{"foo": "bar"}'),
-    ]
-)
-def test_truncate_rpc_args(
-    entrypoint_logger, rpc_worker_ctx,
-    max_length, expected_truncated, expected_args
-):
-    entrypoint_logger.truncated_args_entrypoints = [
-        re.compile('rpc_method')
-    ]
-    entrypoint_logger.truncated_args_length = max_length
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        # Call both worker_setup and worker_result as `args` are logged for
-        # both events.
-        entrypoint_logger.worker_setup(rpc_worker_ctx)
-        entrypoint_logger.worker_result(rpc_worker_ctx)
-
-    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
-    assert request_log['call_args']['args'] == expected_args
-    assert request_log['call_args']['truncated'] is expected_truncated
-    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
-    assert response_log['call_args']['args'] == expected_args
-    assert response_log['call_args']['truncated'] is expected_truncated
-
-
-@pytest.mark.parametrize(
-    ('max_length', 'expected_truncated', 'expected_args'), [
-        (4, True, '{"pa'),
-        (7, True, '{"passw'),
-        (100, False, '{"password": "********"}'),
-    ]
-)
-def test_truncate_sensitive_rpc_args(
-    entrypoint_logger, sensitive_rpc_worker_ctx,
-    max_length, expected_truncated, expected_args
-):
-    entrypoint_logger.truncated_args_entrypoints = [
-        re.compile('sensitive_rpc_method')
-    ]
-    entrypoint_logger.truncated_args_length = max_length
-    with patch.object(entrypoint_logger, 'logger') as logger:
-        # Call both worker_setup and worker_result as `args` are logged for
-        # both events.
-        entrypoint_logger.worker_setup(sensitive_rpc_worker_ctx)
-        entrypoint_logger.worker_result(sensitive_rpc_worker_ctx)
-
-    request_log = get_dict_from_mock_log_call(logger.info.call_args_list[0])
-    assert request_log['call_args']['redacted_args'] == expected_args
-    assert request_log['call_args']['truncated'] is expected_truncated
-    response_log = get_dict_from_mock_log_call(logger.info.call_args_list[1])
-    assert response_log['call_args']['redacted_args'] == expected_args
-    assert response_log['call_args']['truncated'] is expected_truncated
 
 
 def test_can_handle_exception_when_getting_worker_data(entrypoint_logger):
