@@ -20,15 +20,14 @@ from nameko.testing.utils import DummyProvider, get_extension
 from nameko.web.handlers import HttpRequestHandler, http
 from nameko_entrypoint_logger import EntrypointLogger
 from nameko_entrypoint_logger.dependency import (
-    EntrypointLoggingHandler, get_http_request,
-    logging_publisher, get_return_args, should_truncate)
+    get_http_request, get_return_args, should_truncate)
+from nameko_entrypoint_logger.handlers import PublisherHandler, logging_publisher
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
+
 EXCHANGE_NAME = "logging_exchange"
 ROUTING_KEY = "monitoring_log"
-
-publisher = MagicMock()
 
 
 class CustomException(Exception):
@@ -197,9 +196,9 @@ def get_dict_from_mock_log_call(log_call):
 
 
 def test_setup(entrypoint_logger):
-    assert EntrypointLoggingHandler in [
+    assert PublisherHandler in [
         type(handler) for handler in entrypoint_logger.logger.handlers
-        if type(handler) == EntrypointLoggingHandler]
+        if type(handler) == PublisherHandler]
 
     assert EXCHANGE_NAME in str(entrypoint_logger.container.config)
     assert ROUTING_KEY in str(entrypoint_logger.container.config)
@@ -516,19 +515,6 @@ def test_can_get_http_call_args(data, serialized_data, content_type):
     assert request_call_args['headers']['content_type'] == content_type
 
 
-def test_entrypoint_logging_handler_will_publish_log_message():
-    logger = logging.getLogger('test')
-    handler = EntrypointLoggingHandler(publisher)
-    logger.addHandler(handler)
-    message = {'foo': 'bar'}
-    logger.info(json.dumps(message))
-
-    (call_args,), _ = publisher.call_args
-
-    assert publisher.called
-    assert json.loads(call_args) == message
-
-
 def test_event_dispatcher_will_publish_logs(config):
 
     config = config.copy()
@@ -539,7 +525,7 @@ def test_event_dispatcher_will_publish_logs(config):
 
     message = {'foo': 'bar'}
 
-    with patch('nameko_entrypoint_logger.dependency.producers') as mock_producers:
+    with patch('nameko_entrypoint_logger.handlers.producers') as mock_producers:
         with mock_producers[ANY].acquire(block=True) as mock_producer:
             publisher(json.dumps(message))
 
@@ -558,8 +544,8 @@ def test_event_dispatcher_will_publish_logs(config):
 def test_event_dispatcher_will_swallow_exception(config):
     publisher = logging_publisher(config)
 
-    with patch('nameko_entrypoint_logger.dependency.log') as log:
-        with patch('nameko_entrypoint_logger.dependency.producers') as producers:
+    with patch('nameko_entrypoint_logger.handlers.log') as log:
+        with patch('nameko_entrypoint_logger.handlers.producers') as producers:
             with producers[ANY].acquire(block=True) as producer:
                 producer.publish.side_effect = BrokenPipeError(32, 'Oops')
                 publisher({})
