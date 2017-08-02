@@ -47,7 +47,7 @@ class TruncateRequestFilter(TruncateFilter):
     lifecycle_stage = constants.Stage.request
 
     def _filter(self, data):
-        call_args = to_string(data[constants.REQUEST_KEY])
+        call_args = utils.to_string(data[constants.REQUEST_KEY])
         length = len(call_args)
         if length > self.max_len:
             call_args = call_args[:self.max_len]
@@ -73,7 +73,7 @@ class TruncateResponseFilter(TruncateFilter):
     lifecycle_stage = constants.Stage.response
 
     def _filter(self, data):
-        result = to_string(data[constants.RESPONSE_KEY])
+        result = utils.to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:
             result = result[:self.max_len]

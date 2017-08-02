@@ -3,7 +3,6 @@ import logging
 
 from mock import call, patch, Mock
 from nameko.containers import WorkerContext
-from nameko.rpc import rpc
 from nameko.web.handlers import HttpRequestHandler
 from nameko.testing.services import dummy, entrypoint_hook
 from nameko.testing.utils import DummyProvider
@@ -113,7 +112,7 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
     container = container_factory(Service, {})
     container.start()
 
-    with pytest.raises(SomeError) as exc_info:
+    with pytest.raises(SomeError):
         with entrypoint_hook(container, 'some_method') as some_method:
             some_method('ham')
 
@@ -238,8 +237,8 @@ def test_adapters_reused(info, mock_container):
         entrypoint_logger.worker_result
     ]
 
-    for call in calls:
-        call(worker_ctx)
+    for call_ in calls:
+        call_(worker_ctx)
 
         assert len(entrypoint_logger.adapters) == 1
         assert DummyProvider in entrypoint_logger.adapters
@@ -272,9 +271,9 @@ def test_default_adapter_overrides(default_info, http_info, mock_container):
         entrypoint_logger.worker_result
     ]
 
-    for call in calls:
-        call(default_worker_ctx)
-        call(http_worker_ctx)
+    for call_ in calls:
+        call_(default_worker_ctx)
+        call_(http_worker_ctx)
 
         assert len(entrypoint_logger.adapters) == 2
 
@@ -325,9 +324,9 @@ def test_config_adapter_overrides(default_info, some_info, mock_container):
         entrypoint_logger.worker_result
     ]
 
-    for call in calls:
-        call(default_worker_ctx)
-        call(http_worker_ctx)
+    for call_ in calls:
+        call_(default_worker_ctx)
+        call_(http_worker_ctx)
 
         assert len(entrypoint_logger.adapters) == 2
 

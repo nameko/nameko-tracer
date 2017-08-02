@@ -59,8 +59,7 @@ def test_truncate_request(
 
     extra = {
         constants.RECORD_ATTR: {
-            constants.STAGE_KEY: (
-                constants.LifeCycleStage.request.value),
+            constants.STAGE_KEY: constants.Stage.request.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.REQUEST_KEY: '123456789',
         },
@@ -103,8 +102,7 @@ def test_truncate_response(
 
     extra = {
         constants.RECORD_ATTR: {
-            constants.STAGE_KEY: (
-                constants.LifeCycleStage.response.value),
+            constants.STAGE_KEY: constants.Stage.response.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.RESPONSE_KEY: '123456789',
         },

@@ -197,7 +197,6 @@ class HttpRequestHandlerAdapter(EntrypointAdapter):
             elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
                 yield key.lower(), str(value)
 
-
     def get_environ(self, environ):
         """ Return whitelisted environment variables
         """

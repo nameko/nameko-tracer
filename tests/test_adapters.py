@@ -167,7 +167,7 @@ class TestEntrypointAdapter:
         data = getattr(log_record, constants.RECORD_ATTR)
 
         assert data['call_args'] == {'spam': 'some-arg'}
-        assert data['call_args_reducted'] == False
+        assert data['call_args_reducted'] is False
 
     @pytest.mark.parametrize(
         ('result_in', 'expected_result_out'),
@@ -223,7 +223,6 @@ class TestEntrypointAdapter:
         # TODO ...
 
         assert data['status'] == constants.Status.error.value
-
 
     @pytest.fixture(params=[Rpc, EventHandler, Consumer])
     def entrypoint(self, request, container_factory, rabbit_config):
@@ -408,7 +407,7 @@ class TestHttpRequestHandlerAdapter:
 
         call_args, redacted = adapter.get_call_args(worker_ctx)
 
-        assert redacted == False
+        assert redacted is False
 
         assert call_args['request']['data'] == expected_data_out
         assert call_args['request']['headers']['content_type'] == content_type
