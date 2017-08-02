@@ -19,7 +19,7 @@ class TruncateFilter(logging.Filter):
         self.max_len = max_len or 100
 
     def filter(self, log_record):
-        data = getattr(log_record, constants.RECORD_KEY)
+        data = getattr(log_record, constants.RECORD_ATTR)
         lifecycle_stage = data.get(constants.LIFECYCLE_STAGE_KEY)
         entrypoint_name = data.get(constants.ENTRYPOINT_NAME_KEY)
         if (
@@ -27,7 +27,7 @@ class TruncateFilter(logging.Filter):
             any(regex.match(entrypoint_name) for regex in self.entrypoints)
         ):
             data = self._filter(data)
-            setattr(log_record, constants.RECORD_KEY, data)
+            setattr(log_record, constants.RECORD_ATTR, data)
         return log_record
 
     def _filter(self, data):
@@ -40,7 +40,7 @@ class TruncateRequestFilter(TruncateFilter):
 
     default_entrypoints = []
 
-    lifecycle_stage = constants.LifeCycleStage.request
+    lifecycle_stage = constants.Stage.request
 
     def _filter(self, data):
         call_args = data[constants.REQUEST_KEY]
@@ -62,7 +62,7 @@ class TruncateResponseFilter(TruncateFilter):
 
     default_entrypoints = ['^get_|^list_|^query_']
 
-    lifecycle_stage = constants.LifeCycleStage.response
+    lifecycle_stage = constants.Stage.response
 
     def _filter(self, data):
         result = data[constants.RESPONSE_KEY]
