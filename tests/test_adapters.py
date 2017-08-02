@@ -15,6 +15,7 @@ from nameko.events import EventHandler, event_handler
 from nameko.messaging import Consumer, consume
 from nameko.rpc import rpc, Rpc
 from nameko.web.handlers import http, HttpRequestHandler
+from nameko.testing.services import dummy, Entrypoint
 from nameko.testing.utils import get_extension
 import pytest
 from werkzeug.test import create_environ
@@ -61,7 +62,7 @@ class TestEntrypointAdapter:
 
             name = "some-service"
 
-            @rpc
+            @dummy
             def some_method(self, spam):
                 pass
 
@@ -70,7 +71,7 @@ class TestEntrypointAdapter:
     @pytest.fixture
     def worker_ctx(self, container, service_class):
         entrypoint = get_extension(
-            container, Rpc, method_name='some_method')
+            container, Entrypoint, method_name='some_method')
         return WorkerContext(
             container, service_class, entrypoint, args=('some-arg',))
 
@@ -103,7 +104,7 @@ class TestEntrypointAdapter:
         data = getattr(log_record, constants.RECORD_ATTR)
 
         assert data['service'] == 'some-service'
-        assert data['provider'] == 'Rpc'
+        assert data['provider'] == 'Entrypoint'
         assert data['provider_name'] == 'some_method'
         assert data['entrypoint'] == 'some-service.some_method'
         assert data['call_id'] == worker_ctx.call_id
