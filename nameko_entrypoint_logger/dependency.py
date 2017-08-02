@@ -21,28 +21,21 @@ class EntrypointLogger(DependencyProvider):
     """
 
     def __init__(self):
-
         self.logger = None
-
         self.adapters = {}
-
         self.adapter_overrides = {}
-
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
+        config = self.container.config.get(constants.CONFIG_KEY, {})
+
+        self.update_adapter_overrides(constants.ADAPTER_OVERRIDES)
+        self.update_adapter_overrides(
+            config.get(constants.ADAPTERS_CONFIG_KEY, {}))
 
         self.logger = logging.getLogger(constants.LOGGER_NAME)
 
-        adapter_overrides_config = constants.ADAPTER_OVERRIDES
-        for entrypoint_path, adapter_path in adapter_overrides_config.items():
-            entrypoint_class = import_string(entrypoint_path)
-            adapter_class = import_string(adapter_path)
-            self.adapter_overrides[entrypoint_class] = adapter_class
-
-        config = self.container.config.get(constants.CONFIG_KEY, {})
-        adapter_overrides_config = config.get(
-            constants.ADAPTERS_CONFIG_KEY, {})
+    def update_adapter_overrides(self, adapter_overrides_config):
         for entrypoint_path, adapter_path in adapter_overrides_config.items():
             entrypoint_class = import_string(entrypoint_path)
             adapter_class = import_string(adapter_path)
