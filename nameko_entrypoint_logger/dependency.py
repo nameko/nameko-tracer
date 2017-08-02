@@ -1,4 +1,3 @@
-from importlib import import_module
 import logging
 import socket
 from datetime import datetime
@@ -6,8 +5,7 @@ from weakref import WeakKeyDictionary
 
 from nameko.extensions import DependencyProvider
 
-from nameko_entrypoint_logger.formatters import JSONFormatter
-from nameko_entrypoint_logger import adapters, constants
+from nameko_entrypoint_logger import adapters, constants, utils
 
 
 logger = logging.getLogger(__name__)
@@ -37,8 +35,8 @@ class EntrypointLogger(DependencyProvider):
 
     def update_adapter_overrides(self, adapter_overrides_config):
         for entrypoint_path, adapter_path in adapter_overrides_config.items():
-            entrypoint_class = import_string(entrypoint_path)
-            adapter_class = import_string(adapter_path)
+            entrypoint_class = utils.import_by_path(entrypoint_path)
+            adapter_class = utils.import_by_path(adapter_path)
             self.adapter_overrides[entrypoint_class] = adapter_class
 
     def adapter_factory(self, entrypoint_class, extra):
@@ -99,28 +97,3 @@ class EntrypointLogger(DependencyProvider):
                 adapter.info('entrypoint result trace', extra=extra)
         except Exception:
             logger.warning('Failed to log entrypoint trace', exc_info=True)
-
-
-
-def import_string(dotted_path):
-    """
-    Import a dotted module path and return the attribute/class designated by
-    the last name in the path. Raise ImportError if the import failed.
-
-    Borrowed from Django codebase -
-    ``django.utils.module_loading.import_string``
-
-    """
-    try:
-        module_path, class_name = dotted_path.rsplit('.', 1)
-    except ValueError as err:
-        raise ImportError("%s doesn't look like a module path" % dotted_path) from err
-
-    module = import_module(module_path)
-
-    try:
-        return getattr(module, class_name)
-    except AttributeError as err:
-        raise ImportError('Module "%s" does not define a "%s" attribute/class' % (
-            module_path, class_name)
-        ) from err
