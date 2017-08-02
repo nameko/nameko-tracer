@@ -30,67 +30,58 @@ class EntrypointAdapter(logging.LoggerAdapter):
 
         """
 
-        try:
-            # TODO - do I have to do this in the error handling
-            # the code calling the adapter is alreay wrapped in error
-            # handling. Remove the try, except here.
+        lifecycle_stage = kwargs['extra']['lifecycle_stage']
+        worker_ctx = kwargs['extra']['worker_ctx']
+        timestamp = kwargs['extra']['timestamp']
 
-            lifecycle_stage = kwargs['extra']['lifecycle_stage']
-            worker_ctx = kwargs['extra']['worker_ctx']
-            timestamp = kwargs['extra']['timestamp']
+        entrypoint = worker_ctx.entrypoint
 
-            entrypoint = worker_ctx.entrypoint
+        data = kwargs['extra'].get(constants.RECORD_ATTR, {})
 
-            data = kwargs['extra'].get(constants.RECORD_ATTR, {})
+        data[constants.TIMESTAMP_KEY] = timestamp
+        data['service'] = worker_ctx.service_name
+        data['provider'] = type(entrypoint).__name__
+        data['provider_name'] = entrypoint.method_name
+        data['entrypoint'] = '{}.{}'.format(
+                worker_ctx.service_name, entrypoint.method_name)
 
-            data[constants.TIMESTAMP_KEY] = timestamp
-            data['service'] = worker_ctx.service_name
-            data['provider'] = type(entrypoint).__name__
-            data['provider_name'] = entrypoint.method_name
-            data['entrypoint'] = '{}.{}'.format(
-                    worker_ctx.service_name, entrypoint.method_name)
+        data['context_data'] = {
+            LANGUAGE_CONTEXT_KEY: worker_ctx.data.get(
+                LANGUAGE_CONTEXT_KEY),
+            USER_AGENT_CONTEXT_KEY: worker_ctx.data.get(
+                USER_AGENT_CONTEXT_KEY),
+            USER_ID_CONTEXT_KEY: worker_ctx.data.get(
+                USER_ID_CONTEXT_KEY),
+        }
 
-            data['context_data'] = {
-                LANGUAGE_CONTEXT_KEY: worker_ctx.data.get(
-                    LANGUAGE_CONTEXT_KEY),
-                USER_AGENT_CONTEXT_KEY: worker_ctx.data.get(
-                    USER_AGENT_CONTEXT_KEY),
-                USER_ID_CONTEXT_KEY: worker_ctx.data.get(
-                    USER_ID_CONTEXT_KEY),
-            }
+        data['call_id'] = worker_ctx.call_id
+        data['call_stack'] = worker_ctx.call_id_stack
 
-            data['call_id'] = worker_ctx.call_id
-            data['call_stack'] = worker_ctx.call_id_stack
+        data[constants.STAGE_KEY] = lifecycle_stage.value
 
-            data[constants.STAGE_KEY] = lifecycle_stage.value
+        call_args, call_args_redacted = self.get_call_args(worker_ctx)
+        data[constants.REQUEST_KEY] = call_args
+        data[constants.REQUEST_REDUCTED_KEY] = call_args_redacted
 
-            call_args, call_args_redacted = self.get_call_args(worker_ctx)
-            data[constants.REQUEST_KEY] = call_args
-            data[constants.REQUEST_REDUCTED_KEY] = call_args_redacted
+        if lifecycle_stage == constants.Stage.response:
 
-            if lifecycle_stage == constants.Stage.response:
+            exc_info = kwargs['extra']['exc_info_']
 
-                exc_info = kwargs['extra']['exc_info_']
+            if exc_info:
+                data[constants.RESPONSE_STATUS_KEY] = (
+                    constants.Status.error.value)
+                data[constants.EXCEPTION_KEY] = self.get_exception(
+                    worker_ctx, exc_info)
+            else:
+                data[constants.RESPONSE_STATUS_KEY] = (
+                    constants.Status.success.value)
+                result = kwargs['extra']['result']
+                data[constants.RESPONSE_KEY] = self.get_result(result)
 
-                if exc_info:
-                    data[constants.RESPONSE_STATUS_KEY] = (
-                        constants.Status.error.value)
-                    data[constants.EXCEPTION_KEY] = self.get_exception(
-                        worker_ctx, exc_info)
-                else:
-                    data[constants.RESPONSE_STATUS_KEY] = (
-                        constants.Status.success.value)
-                    result = kwargs['extra']['result']
-                    data[constants.RESPONSE_KEY] = self.get_result(result)
+            data[constants.RESPONSE_TIME_KEY] = (
+                kwargs['extra']['response_time'])
 
-                data[constants.RESPONSE_TIME_KEY] = (
-                    kwargs['extra']['response_time'])
-
-            kwargs['extra'][constants.RECORD_ATTR] = data
-
-        except Exception:
-            logger.error('Error when gathering worker data', exc_info=True)
-            message = '{} - error when gathering worker data'.format(message)
+        kwargs['extra'][constants.RECORD_ATTR] = data
 
         return message, kwargs
 
