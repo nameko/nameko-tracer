@@ -1,299 +1,133 @@
-import inspect
-import json
+from importlib import import_module
 import logging
-import re
 import socket
 from datetime import datetime
-from traceback import format_exception
 from weakref import WeakKeyDictionary
 
-import six
-from nameko.exceptions import (
-    ConfigurationError, safe_for_serialization, serialize)
 from nameko.extensions import DependencyProvider
-from nameko.messaging import Consumer
-from nameko.rpc import Rpc
-from nameko.utils import get_redacted_args
-from nameko.web.handlers import HttpRequestHandler
-from werkzeug.wrappers import Response
 
-from nameko_entrypoint_logger.filters import (
-    TruncateRequestFilter,
-    TruncateResponseFilter,
-)
 from nameko_entrypoint_logger.formatters import JSONFormatter
-from nameko_entrypoint_logger.handlers import PublisherHandler, logging_publisher
+from nameko_entrypoint_logger import adapters, constants
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class EntrypointLogger(DependencyProvider):
-    """ Log arguments, results and debugging information
-    of service entrypoints to RabbitMQ. Supported entrypoints: Rpc,
-    Consumer (and it's derived implementation EventHandler) and
-    HttpRequestHandler
+    """ Entrypoint logging dependency
+
+    Logs call and result details about entrypoints fired.
+
     """
 
-    required_config_keys = (
-        'AMQP_URI',
-        'EXCHANGE_NAME',
-        'ROUTING_KEY'
-    )
+    def __init__(self):
 
-    entrypoint_types = (Rpc, Consumer, HttpRequestHandler)
-
-    def __init__(self, propagate=False):
-        """Initialise EntrypointLogger.
-
-        :Parameters:
-            propagate: bool
-                Enable logs propagation to the handlers of higher level.
-        """
-        self.propagate = propagate
         self.logger = None
-        self.enabled = False
+
+        self.adapters = {}
+
+        self.adapter_overrides = {}
+
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
 
-        config = self.container.config.get('ENTRYPOINT_LOGGING')
-        if config and config.get('ENABLED'):
-            self.enabled = True
+        self.logger = logging.getLogger(constants.LOGGER_NAME)
+
+        adapter_overrides_config = constants.ADAPTER_OVERRIDES
+        for entrypoint_path, adapter_path in adapter_overrides_config.items():
+            entrypoint_class = import_string(entrypoint_path)
+            adapter_class = import_string(adapter_path)
+            self.adapter_overrides[entrypoint_class] = adapter_class
+
+        config = self.container.config.get(constants.CONFIG_KEY, {})
+        adapter_overrides_config = config.get(
+            constants.ADAPTERS_CONFIG_KEY, {})
+        for entrypoint_path, adapter_path in adapter_overrides_config.items():
+            entrypoint_class = import_string(entrypoint_path)
+            adapter_class = import_string(adapter_path)
+            self.adapter_overrides[entrypoint_class] = adapter_class
+
+    def adapter_factory(self, entrypoint_class, extra):
+        if entrypoint_class in self.adapter_overrides:
+            adapter_class = self.adapter_overrides[entrypoint_class]
         else:
-            log.warning('EntrypointLogger is disabled')
-            return
+            adapter_class = adapters.EntrypointAdapter
+        return adapter_class(self.logger, extra=extra)
 
-        for key in self.required_config_keys:
-            if key not in config:
-                raise ConfigurationError(
-                    "ENTRYPOINT_LOGGING config missing key `{}`".format(key)
-                )
-
-        logger = logging.getLogger('entrypoint_logger')
-        if logger.level == logging.NOTSET:
-            logger.setLevel(logging.INFO)
-        if logger.propagate:
-            logger.propagate = self.propagate
-        if not logger.handlers:
-            publisher = logging_publisher(
-                self.container.config
-            )
-            handler = PublisherHandler(publisher)
-            #formatter = logging.Formatter('%(message)s')
-            formatter = JSONFormatter()
-            request_filter = TruncateRequestFilter()
-            response_filter = TruncateResponseFilter()
-            handler.setFormatter(formatter)
-            logger.addFilter(request_filter)
-            logger.addFilter(response_filter)
-            logger.addHandler(handler)
-
-        self.logger = logger
-
-    def _get_base_worker_data(self, worker_ctx):
-        timestamp = datetime.utcnow()
+    def get_adapter(self, worker_ctx):
+        key = type(worker_ctx.entrypoint)
         try:
-            call_args = get_call_args(worker_ctx)
-
-            provider = worker_ctx.entrypoint
-            service_name = worker_ctx.service_name
-            provider_name = provider.method_name
-            entrypoint = "{}.{}".format(service_name, provider_name)
-
-            return {
-                'timestamp': timestamp,
-                'provider': type(provider).__name__,
-                'hostname': socket.gethostname(),
-                'service': service_name,
-                'provider_name': provider_name,
-                'entrypoint': entrypoint,
-                'call_id': worker_ctx.call_id,
-                'call_stack': worker_ctx.call_id_stack,
-                'context_data': {
-                    'language': worker_ctx.data.get('language'),
-                    'user_id': worker_ctx.data.get('user_id'),
-                    'user_agent': worker_ctx.data.get('user_agent'),
-                },
-                'call_args': call_args,
-
-            }
-        except Exception as exc:
-            return {
-                'timestamp': timestamp,
-                'error': "Error when gathering worker data: {}".format(exc)
-            }
-
-    def _get_request_worker_data(self, worker_ctx):
-        data = self._get_base_worker_data(worker_ctx)
-        data['lifecycle_stage'] = 'request'
-        return data
-
-    def _get_response_worker_data(self, worker_ctx, result, exc_info):
-        data = self._get_base_worker_data(worker_ctx)
-        data['lifecycle_stage'] = 'response'
-        data['response_time'] = self.calculate_response_time(
-            data, worker_ctx
-        )
-
-        if exc_info is None:
-            data['status'] = 'success'
-
-            return_args = get_return_args(result)
-            if return_args:
-                data['return_args'] = return_args
-
-        else:
-            data['status'] = 'error'
-            data['exception'] = get_exception(worker_ctx, exc_info)
-        return data
+            return self.adapters[key]
+        except KeyError:
+            extra = {constants.HOSTNAME_KEY: socket.gethostname()}
+            self.adapters[key] = self.adapter_factory(key, extra)
+            return self.adapters[key]
 
     def worker_setup(self, worker_ctx):
+        """ Log entrypoint call details
+        """
+
+        timestamp = datetime.utcnow()
+        self.worker_timestamps[worker_ctx] = timestamp
+
         try:
-            if not self.should_log(worker_ctx.entrypoint):
-                return
-
-            data = self._get_request_worker_data(worker_ctx)
-            self.logger.info('entrypoint request', extra={'data': data})
-
-            self.worker_timestamps[worker_ctx] = data['timestamp']
-
-        except Exception as exc:
-            log.error(exc)
+            extra = {
+                'lifecycle_stage': constants.Stage.request,
+                'worker_ctx': worker_ctx,
+                'timestamp': timestamp,
+            }
+            adapter = self.get_adapter(worker_ctx)
+            adapter.info('entrypoint call trace', extra=extra)
+        except Exception:
+            logger.warning('Failed to log entrypoint trace', exc_info=True)
 
     def worker_result(self, worker_ctx, result=None, exc_info=None):
+        """ Log entrypoint result details
+        """
+
+        timestamp = datetime.utcnow()
+        worker_setup_timestamp = self.worker_timestamps[worker_ctx]
+        response_time = (timestamp - worker_setup_timestamp).total_seconds()
+
         try:
-            if not self.should_log(worker_ctx.entrypoint):
-                return
-
-            data = self._get_response_worker_data(worker_ctx, result, exc_info)
-            self.logger.info('entrypoint response', extra={'data': data})
-
-        except Exception as exc:
-            log.error(exc)
-
-    def calculate_response_time(self, data, worker_ctx):
-        now = data['timestamp']
-        worker_setup_time = self.worker_timestamps[worker_ctx]
-        return (now - worker_setup_time).total_seconds()
-
-    def should_log(self, entrypoint):
-        return self.enabled and isinstance(entrypoint, self.entrypoint_types)
-
-
-def get_entrypoint_call_args(worker_ctx):
-    provider = worker_ctx.entrypoint
-    method = getattr(provider.container.service_cls, provider.method_name)
-
-    call_args = inspect.getcallargs(
-        method, None, *worker_ctx.args, **worker_ctx.kwargs
-    )
-
-    del call_args['self']
-
-    return call_args
+            extra = {
+                'lifecycle_stage': constants.Stage.response,
+                'worker_ctx': worker_ctx,
+                'result': result,
+                'exc_info_': exc_info,
+                'timestamp': timestamp,
+                'response_time': response_time,
+            }
+            adapter = self.get_adapter(worker_ctx)
+            if exc_info:
+                adapter.warning('entrypoint result trace', extra=extra)
+            else:
+                adapter.info('entrypoint result trace', extra=extra)
+        except Exception:
+            logger.warning('Failed to log entrypoint trace', exc_info=True)
 
 
-def get_call_args(worker_ctx):
-    provider = worker_ctx.entrypoint
-    call_args = {}
-    if getattr(provider, 'sensitive_variables', None):
-        redacted_callargs = get_redacted_args(
-            provider, *worker_ctx.args, **worker_ctx.kwargs)
 
-        return {'redacted_args': to_string(redacted_callargs)}
+def import_string(dotted_path):
+    """
+    Import a dotted module path and return the attribute/class designated by
+    the last name in the path. Raise ImportError if the import failed.
 
-    # TODO: HttpRequestHandler should support sensitive_variables
-    # Also get_redacted_args should be tolerant of
-    # entrypoints that don't define them
-    args = get_entrypoint_call_args(worker_ctx)
-    request = args.pop('request', None)
+    Borrowed from Django codebase -
+    ``django.utils.module_loading.import_string``
 
-    call_args = {'args': to_string(safe_for_serialization(args))}
-    if request:
-        call_args['request'] = get_http_request(request)
-    return call_args
+    """
+    try:
+        module_path, class_name = dotted_path.rsplit('.', 1)
+    except ValueError as err:
+        raise ImportError("%s doesn't look like a module path" % dotted_path) from err
 
-
-def get_return_args(result):
-    if isinstance(result, Response):
-        # spceific case for processing HTTP response
-        return {
-            'content_type': result.content_type,
-            'result': to_string(result.get_data()),
-            'status_code': result.status_code,
-            'result_bytes': result.content_length,
-        }
-    # All other responses
-    result_string = to_string(safe_for_serialization(result))
-    return {
-        'result_bytes': len(result_string),
-        'result': result_string,
-    }
-
-
-def get_exception(worker_ctx, exc_info):
-    expected_exceptions = getattr(
-        worker_ctx.entrypoint, 'expected_exceptions', None
-    ) or tuple()  # can have attr set to None
-    exc = exc_info[1]
-    is_expected = isinstance(exc, expected_exceptions)
+    module = import_module(module_path)
 
     try:
-        exc_repr = serialize(exc)
-    except Exception:
-        exc_repr = "[exc serialization failed]"
-
-    try:
-        exc_traceback = ''.join(format_exception(*exc_info))
-    except Exception:
-        exc_traceback = "[format_exception failed]"
-
-    return {
-        'exc_type': exc_info[0].__name__,
-        'exc': to_string(exc_repr),
-        'traceback': exc_traceback,
-        'expected_error': is_expected,
-    }
-
-
-def get_http_request(request):
-    data = request.data or request.form
-    return {
-        'url': request.url,
-        'method': request.method,
-        'data': to_string(data),
-        'headers': dict(get_headers(request.environ)),
-        'env': dict(get_environ(request.environ)),
-    }
-
-
-def get_headers(environ):
-    """
-    Returns only proper HTTP headers.
-    """
-    for key, value in six.iteritems(environ):
-        key = str(key)
-        if key.startswith('HTTP_') and key not in \
-                ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
-            yield key[5:].lower(), str(value)
-        elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
-            yield key.lower(), str(value)
-
-
-def get_environ(environ):
-    """
-    Returns our whitelisted environment variables.
-    """
-    for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
-        if key in environ:
-            yield key.lower(), str(environ[key])
-
-
-def to_string(value):
-    if isinstance(value, six.string_types):
-        return value
-    if isinstance(value, (dict, list)):
-        return json.dumps(value)
-    if isinstance(value, bytes):
-        return value.decode("utf-8")
+        return getattr(module, class_name)
+    except AttributeError as err:
+        raise ImportError('Module "%s" does not define a "%s" attribute/class' % (
+            module_path, class_name)
+        ) from err
