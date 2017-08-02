@@ -2,7 +2,7 @@ import logging
 import re
 
 
-from nameko_entrypoint_logger import constants
+from nameko_entrypoint_logger import constants, utils
 
 
 class TruncateFilter(logging.Filter):
@@ -20,7 +20,7 @@ class TruncateFilter(logging.Filter):
 
     def filter(self, log_record):
         data = getattr(log_record, constants.RECORD_ATTR)
-        lifecycle_stage = data.get(constants.LIFECYCLE_STAGE_KEY)
+        lifecycle_stage = data.get(constants.STAGE_KEY)
         entrypoint_name = data.get(constants.ENTRYPOINT_NAME_KEY)
         if (
             lifecycle_stage == self.lifecycle_stage.value and
@@ -36,6 +36,10 @@ class TruncateFilter(logging.Filter):
 
 class TruncateRequestFilter(TruncateFilter):
     """ Truncate serialized call arguments
+
+    If the truncation is applied, the call data is serialised to string
+    beforehand.
+
     """
 
     default_entrypoints = []
@@ -43,7 +47,7 @@ class TruncateRequestFilter(TruncateFilter):
     lifecycle_stage = constants.Stage.request
 
     def _filter(self, data):
-        call_args = data[constants.REQUEST_KEY]
+        call_args = to_string(data[constants.REQUEST_KEY])
         length = len(call_args)
         if length > self.max_len:
             call_args = call_args[:self.max_len]
@@ -58,6 +62,10 @@ class TruncateRequestFilter(TruncateFilter):
 
 class TruncateResponseFilter(TruncateFilter):
     """ Truncate serialized response data
+
+    If the truncation is applied, the call data is serialised to string
+    beforehand.
+
     """
 
     default_entrypoints = ['^get_|^list_|^query_']
@@ -65,7 +73,7 @@ class TruncateResponseFilter(TruncateFilter):
     lifecycle_stage = constants.Stage.response
 
     def _filter(self, data):
-        result = data[constants.RESPONSE_KEY]
+        result = to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:
             result = result[:self.max_len]

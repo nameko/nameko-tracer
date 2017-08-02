@@ -1,5 +1,4 @@
 import inspect
-import json
 import logging
 from traceback import format_exception
 
@@ -12,7 +11,7 @@ from nameko.exceptions import safe_for_serialization, serialize
 from nameko.utils import get_redacted_args
 import six
 
-from nameko_entrypoint_logger import constants
+from nameko_entrypoint_logger import constants, utils
 
 
 logger = logging.getLogger(__name__)
@@ -113,12 +112,12 @@ class EntrypointAdapter(logging.LoggerAdapter):
             del call_args['self']
             redacted = False
 
-        return to_string(call_args), redacted
+        return call_args, redacted
 
     def get_result(self, result):
         """ Return serialized result data
         """
-        return to_string(safe_for_serialization(result))
+        return safe_for_serialization(result)
 
     def get_exception(self, worker_ctx, exc_info):
         """ Transform exception to serialisable dictionary
@@ -143,7 +142,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
 
         return {
             'exc_type': exc_info[0].__name__,
-            'exc': to_string(exc_repr),
+            'exc': utils.to_string(exc_repr),
             'traceback': exc_traceback,
             'expected_error': is_expected,
         }
@@ -170,22 +169,22 @@ class HttpRequestHandlerAdapter(EntrypointAdapter):
         call_args['request'] = {
             'url': request.url,
             'method': request.method,
-            'data': to_string(data),
+            'data': utils.to_string(data),
             'headers': dict(self.get_headers(request.environ)),
             'env': dict(self.get_environ(request.environ)),
         }
 
-        return to_string(call_args), False
+        return call_args, False
 
     def get_result(self, result):
         """ Transform response object to serialised dictionary
         """
-        return to_string({
+        return {
             'content_type': result.content_type,
-            'result': to_string(result.get_data()),
+            'result': result.get_data(),
             'status_code': result.status_code,
             'result_bytes': result.content_length,
-        })
+        }
 
     def get_headers(self, environ):
         """ Return only proper HTTP headers
@@ -205,12 +204,3 @@ class HttpRequestHandlerAdapter(EntrypointAdapter):
         for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
             if key in environ:
                 yield key.lower(), str(environ[key])
-
-
-def to_string(value):
-    if isinstance(value, six.string_types):
-        return value
-    if isinstance(value, (dict, list)):
-        return json.dumps(value)
-    if isinstance(value, bytes):
-        return value.decode("utf-8")

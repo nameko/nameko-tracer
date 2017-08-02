@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import logging
 import logging.handlers
@@ -91,6 +92,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
+            'timestamp': datetime(2017, 7, 7, 12, 0, 0),
+            'response_time': 60.0,
         }
 
         adapter.info('spam', extra=extra)
@@ -124,6 +127,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -151,6 +156,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -159,7 +166,7 @@ class TestEntrypointAdapter:
 
         data = getattr(log_record, constants.RECORD_ATTR)
 
-        assert data['call_args'] == '{"spam": "some-arg"}'
+        assert data['call_args'] == {'spam': 'some-arg'}
         assert data['call_args_reducted'] == False
 
     @pytest.mark.parametrize(
@@ -167,7 +174,7 @@ class TestEntrypointAdapter:
         (
             (None, 'None'),
             ('spam', 'spam'),
-            ({'spam': 'ham'}, '{"spam": "ham"}'),
+            ({'spam': 'ham'}, {'spam': 'ham'}),
         ),
     )
     def test_result_data(
@@ -179,6 +186,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': result_in,
             'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -201,6 +210,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': exc_info,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -261,6 +272,8 @@ class TestEntrypointAdapter:
             'worker_ctx': worker_ctx,
             'result': {'some': 'data'},
             'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -269,7 +282,7 @@ class TestEntrypointAdapter:
 
         data = getattr(log_record, constants.RECORD_ATTR)
 
-        assert data['return_args'] == '{"some": "data"}'
+        assert data['return_args'] == {'some': 'data'}
         assert data['status'] == constants.Status.success.value
         assert data['provider'] == entrypoint.__class__.__name__
         assert data['provider_name'] == entrypoint.method_name
@@ -330,6 +343,8 @@ class TestHttpRequestHandlerAdapter:
             'result': Response(
                 json.dumps({"value": 1}), mimetype='application/json'),
             'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
         }
 
         adapter.info('spam', extra=extra)
@@ -338,7 +353,7 @@ class TestHttpRequestHandlerAdapter:
 
         data = getattr(log_record, constants.RECORD_ATTR)
 
-        call_args = json.loads(data['call_args'])
+        call_args = data['call_args']
 
         assert call_args['value'] == 1
 
@@ -392,7 +407,6 @@ class TestHttpRequestHandlerAdapter:
             container, service_class, entrypoint, args=(request, 1))
 
         call_args, redacted = adapter.get_call_args(worker_ctx)
-        call_args = json.loads(call_args)
 
         assert redacted == False
 
@@ -427,8 +441,7 @@ class TestHttpRequestHandlerAdapter:
             data, status=status_code, mimetype=content_type)
 
         result = adapter.get_result(response)
-        result = json.loads(result)
 
-        assert result['result'] == data
+        assert result['result'] == data.encode('utf-8')
         assert result['status_code'] == status_code
         assert result['content_type'].startswith(content_type)
