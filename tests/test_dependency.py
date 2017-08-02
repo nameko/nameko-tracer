@@ -305,7 +305,7 @@ def test_config_adapter_overrides(default_info, some_info, mock_container):
         constants.CONFIG_KEY: {
             constants.ADAPTERS_CONFIG_KEY: {
                 'nameko.web.handlers.HttpRequestHandler':
-                    'test_dependencynew.SomeAdapter',
+                    'test_dependency.SomeAdapter',
             }
         }
     }
