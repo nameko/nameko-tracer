@@ -1,3 +1,3 @@
 coverage:
-	coverage run --concurrency=eventlet --source nameko_entrypoint_logger.py -m pytest test_nameko_entrypoint_logger.py -x
+	coverage run --concurrency=eventlet --source nameko_entrypoint_logger -m pytest tests -x
 	coverage report -m

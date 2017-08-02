@@ -9,5 +9,5 @@ dependencies:
 
 test:
     override:
-      - coverage run --concurrency=eventlet --source nameko_entrypoint_logger.py -m pytest test_nameko_entrypoint_logger.py
+      - coverage run --concurrency=eventlet --source nameko_entrypoint_logger -m pytest tests
       - coverage html -d $CIRCLE_ARTIFACTS --fail-under 100
