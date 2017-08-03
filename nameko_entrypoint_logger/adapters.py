@@ -124,12 +124,12 @@ class EntrypointAdapter(logging.LoggerAdapter):
         try:
             exc_repr = serialize(exc)
         except Exception:
-            exc_repr = "[exc serialization failed]"
+            exc_repr = 'exception serialization failed'
 
         try:
             exc_traceback = ''.join(format_exception(*exc_info))
         except Exception:
-            exc_traceback = "[format_exception failed]"
+            exc_traceback = 'traceback serialization failed'
 
         return {
             'exc_type': exc_info[0].__name__,

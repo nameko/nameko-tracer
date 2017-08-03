@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 
 from kombu import Exchange, Queue
-from mock import Mock
+from mock import patch, Mock
 from nameko.containers import WorkerContext
 from nameko.contextdata import (
     LANGUAGE_CONTEXT_KEY,
@@ -202,9 +202,11 @@ class TestEntrypointAdapter:
 
     def test_error_data(self, adapter, tracker, worker_ctx):
 
-        exception = ValueError("Invalid value")
-        mock_exception = Mock()
-        exc_info = (Exception, mock_exception, exception.__traceback__)
+        class Error(Exception):
+            pass
+
+        exception = Error('Yo!')
+        exc_info = (Error, exception, exception.__traceback__)
 
         extra = {
             'stage': constants.Stage.response,
@@ -221,7 +223,115 @@ class TestEntrypointAdapter:
 
         data = getattr(log_record, constants.RECORD_ATTR)
 
-        # TODO ...
+        assert 'return_args' not in data
+
+        exc = json.loads(data['error']['exc'])
+        assert exc['exc_path'] == 'test_adapters.Error'
+        assert exc['exc_args'] == ["Yo!"]
+        assert exc['exc_type'] == 'Error'
+        assert exc['value'] == 'Yo!'
+
+        assert data['error']['exc_type'] == 'Error'
+        assert 'Error: Yo!' in data['error']['traceback']
+        assert data['error']['expected_error'] is False
+
+        assert data['status'] == constants.Status.error.value
+
+    @pytest.mark.parametrize('expected_exceptions', (None, (), (ValueError)))
+    def test_error_data_unexpected_exception(
+        self, adapter, tracker, worker_ctx, expected_exceptions
+    ):
+
+        worker_ctx.entrypoint.expected_exceptions = expected_exceptions
+
+        class Error(Exception):
+            pass
+
+        exception = Error('Yo!')
+        exc_info = (Error, exception, exception.__traceback__)
+
+        extra = {
+            'stage': constants.Stage.response,
+            'worker_ctx': worker_ctx,
+            'result': None,
+            'exc_info_': exc_info,
+            'timestamp': None,
+            'response_time': None,
+        }
+
+        adapter.info('spam', extra=extra)
+
+        log_record = tracker.log_records[-1]
+
+        data = getattr(log_record, constants.RECORD_ATTR)
+
+        assert data['error']['expected_error'] is False
+
+    def test_error_data_expected_exception(
+        self, adapter, tracker, worker_ctx
+    ):
+
+        class Error(Exception):
+            pass
+
+        worker_ctx.entrypoint.expected_exceptions = (Error)
+
+        exception = Error('Yo!')
+        exc_info = (Error, exception, exception.__traceback__)
+
+        extra = {
+            'stage': constants.Stage.response,
+            'worker_ctx': worker_ctx,
+            'result': None,
+            'exc_info_': exc_info,
+            'timestamp': None,
+            'response_time': None,
+        }
+
+        adapter.info('spam', extra=extra)
+
+        log_record = tracker.log_records[-1]
+
+        data = getattr(log_record, constants.RECORD_ATTR)
+
+        assert data['error']['expected_error'] is True
+
+    @patch('nameko_entrypoint_logger.adapters.serialize')
+    @patch('nameko_entrypoint_logger.adapters.format_exception')
+    def test_error_data_deals_with_failing_exception_serilisation(
+        self, format_exception, serialize, adapter, tracker, worker_ctx
+    ):
+
+        format_exception.side_effect = ValueError()
+        serialize.side_effect = ValueError()
+
+        class Error(Exception):
+            pass
+
+        exception = Error('Yo!')
+        exc_info = (Error, exception, exception.__traceback__)
+
+        extra = {
+            'stage': constants.Stage.response,
+            'worker_ctx': worker_ctx,
+            'result': None,
+            'exc_info_': exc_info,
+            'timestamp': None,
+            'response_time': None,
+        }
+
+        adapter.info('spam', extra=extra)
+
+        log_record = tracker.log_records[-1]
+
+        data = getattr(log_record, constants.RECORD_ATTR)
+
+        assert 'return_args' not in data
+
+        assert data['error']['exc'] == 'exception serialization failed'
+        assert data['error']['traceback'] == 'traceback serialization failed'
+        assert data['error']['exc_type'] == 'Error'
+        assert data['error']['expected_error'] is False
 
         assert data['status'] == constants.Status.error.value
 
