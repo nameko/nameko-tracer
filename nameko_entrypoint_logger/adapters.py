@@ -70,7 +70,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
             if exc_info:
                 data[constants.RESPONSE_STATUS_KEY] = (
                     constants.Status.error.value)
-                data[constants.EXCEPTION_KEY] = self.get_exception(
+                data[constants.ERROR_KEY] = self.get_error(
                     worker_ctx, exc_info)
             else:
                 data[constants.RESPONSE_STATUS_KEY] = (
@@ -110,7 +110,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
         """
         return safe_for_serialization(result)
 
-    def get_exception(self, worker_ctx, exc_info):
+    def get_error(self, worker_ctx, exc_info):
         """ Transform exception to serialisable dictionary
         """
 

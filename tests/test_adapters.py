@@ -171,6 +171,34 @@ class TestEntrypointAdapter:
         assert data['call_args_redacted'] is False
 
     @pytest.mark.parametrize(
+        'stage',
+        (constants.Stage.request, constants.Stage.response),
+    )
+    def test_sensitive_call_args_data(
+        self, adapter, tracker, worker_ctx, stage
+    ):
+
+        worker_ctx.entrypoint.sensitive_variables = ('spam')
+
+        extra = {
+            'stage': stage,
+            'worker_ctx': worker_ctx,
+            'result': None,
+            'exc_info_': None,
+            'timestamp': None,
+            'response_time': None,
+        }
+
+        adapter.info('spam', extra=extra)
+
+        log_record = tracker.log_records[-1]
+
+        data = getattr(log_record, constants.RECORD_ATTR)
+
+        assert data['call_args'] == {'spam': '********'}
+        assert data['call_args_redacted'] is True
+
+    @pytest.mark.parametrize(
         ('result_in', 'expected_result_out'),
         (
             (None, 'None'),
