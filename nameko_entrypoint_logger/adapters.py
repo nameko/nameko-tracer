@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 class EntrypointAdapter(logging.LoggerAdapter):
 
     def process(self, message, kwargs):
-        """ Extract usefull entrypoint processing information
+        """ Extract useful entrypoint processing information
 
-        Extract usefull entrypoint information and set it as ``data`` attr
-        of the log record. Content should be easily seriasible as the most
+        Extract useful entrypoint information and set it as ``data`` attr
+        of the log record. Content should be easily serialisable the most
         probable formatter used would be JSON-like and the aim is to fill
         ``data`` with something that can go easily over a wire and that can
         be easily stored, filtered and searched.
@@ -86,7 +86,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
         return message, kwargs
 
     def get_call_args(self, worker_ctx):
-        """ Return seriasible call arguments
+        """ Return serialisable call arguments
         """
 
         provider = worker_ctx.entrypoint
@@ -106,7 +106,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
         return call_args, redacted
 
     def get_result(self, result):
-        """ Return serialized result data
+        """ Return serialisable result data
         """
         return safe_for_serialization(result)
 
@@ -168,7 +168,7 @@ class HttpRequestHandlerAdapter(EntrypointAdapter):
         return call_args, False
 
     def get_result(self, result):
-        """ Transform response object to serialised dictionary
+        """ Transform response object to serialisable dictionary
         """
         return {
             'content_type': result.content_type,
@@ -189,7 +189,7 @@ class HttpRequestHandlerAdapter(EntrypointAdapter):
                 yield key.lower(), str(value)
 
     def get_environ(self, environ):
-        """ Return whitelisted environment variables
+        """ Return white-listed environment variables
         """
         for key in ('REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT'):
             if key in environ:
