@@ -81,15 +81,15 @@ class TestEntrypointAdapter:
         return adapter
 
     @pytest.mark.parametrize(
-        'lifecycle_stage',
+        'stage',
         (constants.Stage.request, constants.Stage.response),
     )
     def test_common_worker_data(
-        self, adapter, tracker, worker_ctx, lifecycle_stage
+        self, adapter, tracker, worker_ctx, stage
     ):
 
         extra = {
-            'lifecycle_stage': lifecycle_stage,
+            'stage': stage,
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
@@ -109,14 +109,14 @@ class TestEntrypointAdapter:
         assert data['entrypoint'] == 'some-service.some_method'
         assert data['call_id'] == worker_ctx.call_id
         assert data['call_stack'] == worker_ctx.call_id_stack
-        assert data['lifecycle_stage'] == lifecycle_stage.value
+        assert data['lifecycle_stage'] == stage.value
 
     @pytest.mark.parametrize(
-        'lifecycle_stage',
+        'stage',
         (constants.Stage.request, constants.Stage.response),
     )
     def test_worker_ctx_data(
-        self, adapter, tracker, worker_ctx, lifecycle_stage
+        self, adapter, tracker, worker_ctx, stage
     ):
 
         worker_ctx.data = {
@@ -124,7 +124,7 @@ class TestEntrypointAdapter:
             'some-other-key': 'should-be-ignored',
         }
         extra = {
-            'lifecycle_stage': lifecycle_stage,
+            'stage': stage,
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
@@ -145,15 +145,15 @@ class TestEntrypointAdapter:
         }
 
     @pytest.mark.parametrize(
-        'lifecycle_stage',
+        'stage',
         (constants.Stage.request, constants.Stage.response),
     )
     def test_call_args_data(
-        self, adapter, tracker, worker_ctx, lifecycle_stage
+        self, adapter, tracker, worker_ctx, stage
     ):
 
         extra = {
-            'lifecycle_stage': lifecycle_stage,
+            'stage': stage,
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': None,
@@ -183,7 +183,7 @@ class TestEntrypointAdapter:
     ):
 
         extra = {
-            'lifecycle_stage': constants.Stage.response,
+            'stage': constants.Stage.response,
             'worker_ctx': worker_ctx,
             'result': result_in,
             'exc_info_': None,
@@ -207,7 +207,7 @@ class TestEntrypointAdapter:
         exc_info = (Exception, mock_exception, exception.__traceback__)
 
         extra = {
-            'lifecycle_stage': constants.Stage.response,
+            'stage': constants.Stage.response,
             'worker_ctx': worker_ctx,
             'result': None,
             'exc_info_': exc_info,
@@ -268,7 +268,7 @@ class TestEntrypointAdapter:
         entrypoint, worker_ctx = entrypoint
 
         extra = {
-            'lifecycle_stage': constants.Stage.response,
+            'stage': constants.Stage.response,
             'worker_ctx': worker_ctx,
             'result': {'some': 'data'},
             'exc_info_': None,
@@ -330,15 +330,15 @@ class TestHttpRequestHandlerAdapter:
         return adapter
 
     @pytest.mark.parametrize(
-        'lifecycle_stage',
+        'stage',
         (constants.Stage.request, constants.Stage.response),
     )
     def test_call_args_data(
-        self, adapter, tracker, worker_ctx, lifecycle_stage
+        self, adapter, tracker, worker_ctx, stage
     ):
 
         extra = {
-            'lifecycle_stage': lifecycle_stage,
+            'stage': stage,
             'worker_ctx': worker_ctx,
             'result': Response(
                 json.dumps({"value": 1}), mimetype='application/json'),

@@ -64,7 +64,7 @@ class EntrypointLogger(DependencyProvider):
 
         try:
             extra = {
-                'lifecycle_stage': constants.Stage.request,
+                'stage': constants.Stage.request,
                 'worker_ctx': worker_ctx,
                 'timestamp': timestamp,
             }
@@ -83,7 +83,7 @@ class EntrypointLogger(DependencyProvider):
 
         try:
             extra = {
-                'lifecycle_stage': constants.Stage.response,
+                'stage': constants.Stage.response,
                 'worker_ctx': worker_ctx,
                 'result': result,
                 'exc_info_': exc_info,

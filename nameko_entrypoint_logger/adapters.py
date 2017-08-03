@@ -30,7 +30,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
 
         """
 
-        lifecycle_stage = kwargs['extra']['lifecycle_stage']
+        stage = kwargs['extra']['stage']
         worker_ctx = kwargs['extra']['worker_ctx']
         timestamp = kwargs['extra']['timestamp']
 
@@ -57,13 +57,13 @@ class EntrypointAdapter(logging.LoggerAdapter):
         data[constants.CALL_ID_KEY] = worker_ctx.call_id
         data[constants.CALL_ID_STACK_KEY] = worker_ctx.call_id_stack
 
-        data[constants.STAGE_KEY] = lifecycle_stage.value
+        data[constants.STAGE_KEY] = stage.value
 
         call_args, call_args_redacted = self.get_call_args(worker_ctx)
         data[constants.REQUEST_KEY] = call_args
         data[constants.REQUEST_REDUCTED_KEY] = call_args_redacted
 
-        if lifecycle_stage == constants.Stage.response:
+        if stage == constants.Stage.response:
 
             exc_info = kwargs['extra']['exc_info_']
 
