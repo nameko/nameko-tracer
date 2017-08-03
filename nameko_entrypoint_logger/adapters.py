@@ -39,10 +39,10 @@ class EntrypointAdapter(logging.LoggerAdapter):
         data = kwargs['extra'].get(constants.RECORD_ATTR, {})
 
         data[constants.TIMESTAMP_KEY] = timestamp
-        data['service'] = worker_ctx.service_name
-        data['provider'] = type(entrypoint).__name__
-        data['provider_name'] = entrypoint.method_name
-        data['entrypoint'] = '{}.{}'.format(
+        data[constants.SERVICE_NAME_KEY] = worker_ctx.service_name
+        data[constants.ENTRYPOINT_TYPE_KEY] = type(entrypoint).__name__
+        data[constants.ENTRYPOINT_NAME_KEY] = entrypoint.method_name
+        data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
                 worker_ctx.service_name, entrypoint.method_name)
 
         data['context_data'] = {
@@ -54,8 +54,8 @@ class EntrypointAdapter(logging.LoggerAdapter):
                 USER_ID_CONTEXT_KEY),
         }
 
-        data['call_id'] = worker_ctx.call_id
-        data['call_stack'] = worker_ctx.call_id_stack
+        data[constants.CALL_ID_KEY] = worker_ctx.call_id
+        data[constants.CALL_ID_STACK_KEY] = worker_ctx.call_id_stack
 
         data[constants.STAGE_KEY] = lifecycle_stage.value
 

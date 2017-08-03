@@ -168,7 +168,7 @@ class TestEntrypointAdapter:
         data = getattr(log_record, constants.RECORD_ATTR)
 
         assert data['call_args'] == {'spam': 'some-arg'}
-        assert data['call_args_reducted'] is False
+        assert data['call_args_redacted'] is False
 
     @pytest.mark.parametrize(
         ('result_in', 'expected_result_out'),
