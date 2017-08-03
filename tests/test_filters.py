@@ -115,3 +115,53 @@ def test_truncate_response(
     assert data[constants.RESPONSE_KEY] == expected_response
     assert data.get(constants.RESPONSE_TRUNCATED_KEY, False) == truncated
     assert data.get(constants.RESPONSE_LENGTH_KEY) == expected_response_length
+
+
+def test_truncate_request_ignores_response_data(handler, logger):
+
+    filter_ = filters.TruncateRequestFilter(entrypoints=['^spam'], max_len=5)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.RECORD_ATTR: {
+            constants.STAGE_KEY: constants.Stage.response.value,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+            constants.RESPONSE_KEY: '123456789',
+        },
+    }
+
+    logger.info('response', extra=extra)
+
+    data = getattr(handler.log_record, constants.RECORD_ATTR)
+
+    assert data[constants.RESPONSE_KEY] == '123456789'
+    assert constants.REQUEST_TRUNCATED_KEY not in data
+    assert constants.REQUEST_LENGTH_KEY not in data
+    assert constants.RESPONSE_TRUNCATED_KEY not in data
+    assert constants.RESPONSE_LENGTH_KEY not in data
+
+
+def test_truncate_response_ignores_request_data(handler, logger):
+
+    filter_ = filters.TruncateResponseFilter(entrypoints=['^spam'], max_len=5)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.RECORD_ATTR: {
+            constants.STAGE_KEY: constants.Stage.request.value,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+            constants.REQUEST_KEY: '123456789',
+        },
+    }
+
+    logger.info('request', extra=extra)
+
+    data = getattr(handler.log_record, constants.RECORD_ATTR)
+
+    assert data[constants.REQUEST_KEY] == '123456789'
+    assert constants.RESPONSE_TRUNCATED_KEY not in data
+    assert constants.RESPONSE_LENGTH_KEY not in data
+    assert constants.REQUEST_TRUNCATED_KEY not in data
+    assert constants.REQUEST_LENGTH_KEY not in data

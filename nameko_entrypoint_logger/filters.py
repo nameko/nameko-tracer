@@ -5,11 +5,11 @@ import re
 from nameko_entrypoint_logger import constants, utils
 
 
-class TruncateFilter(logging.Filter):
+class BaseTruncateFilter(logging.Filter):
 
     default_entrypoints = []
 
-    lifecycle_stage = NotImplemented
+    lifecycle_stage = None
 
     def __init__(self, entrypoints=None, max_len=None):
 
@@ -31,10 +31,10 @@ class TruncateFilter(logging.Filter):
         return log_record
 
     def _filter(self, data):
-        return data
+        raise NotImplementedError()  # pragma: no cover
 
 
-class TruncateRequestFilter(TruncateFilter):
+class TruncateRequestFilter(BaseTruncateFilter):
     """ Truncate serialized call arguments
 
     If the truncation is applied, the call data is serialised to string
@@ -60,7 +60,7 @@ class TruncateRequestFilter(TruncateFilter):
         return data
 
 
-class TruncateResponseFilter(TruncateFilter):
+class TruncateResponseFilter(BaseTruncateFilter):
     """ Truncate serialized response data
 
     If the truncation is applied, the call data is serialised to string
