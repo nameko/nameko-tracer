@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 
 from kombu import Exchange, Queue
-from mock import patch, Mock
+from mock import patch
 from nameko.containers import WorkerContext
 from nameko.contextdata import (
     LANGUAGE_CONTEXT_KEY,

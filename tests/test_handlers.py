@@ -64,8 +64,7 @@ def test_handler_will_fial_with_logging_the_error(
 
     message = {'foo': 'bar'}
 
-    with producers[ANY].acquire(block=True) as producer:
-        logger.info(json.dumps(message))
+    logger.info(json.dumps(message))
 
     assert (
         module_logger.error.call_args ==
