@@ -2,6 +2,8 @@ from datetime import datetime
 import json
 import logging
 
+from nameko_entrypoint_logger import constants
+
 
 def default(obj):
     """ Default JSON serializer.
@@ -22,4 +24,4 @@ def dumps(obj):
 class JSONFormatter(logging.Formatter):
 
     def format(self, record):
-        return dumps(record.data)
+        return dumps(getattr(record, constants.RECORD_ATTR))
