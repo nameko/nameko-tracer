@@ -1,22 +1,40 @@
 import json
 import logging
 
-from mock import MagicMock
+from mock import ANY, call, patch
 
 from nameko_entrypoint_logger.handlers import PublisherHandler
 
 
-publisher = MagicMock()
+@patch('nameko_entrypoint_logger.handlers.connections')
+@patch('nameko_entrypoint_logger.handlers.producers')
+def test_handler_will_publish_log_message(producers, connections):
 
+    amqp_uri = 'some:uri'
+    exchange_name = 'someexchange'
+    routing_key = 'some.routing.key'
+    serializer = 'raw'
+    content_type = 'binary'
 
-def test_entrypoint_logging_handler_will_publish_log_message():
+    handler = PublisherHandler(
+        amqp_uri=amqp_uri,
+        exchange_name=exchange_name,
+        routing_key=routing_key,
+        serializer=serializer,
+        content_type=content_type,
+    )
+
     logger = logging.getLogger('test')
-    handler = PublisherHandler(publisher)
     logger.addHandler(handler)
+
     message = {'foo': 'bar'}
-    logger.info(json.dumps(message))
 
-    (call_args,), _ = publisher.call_args
+    with producers[ANY].acquire(block=True) as producer:
+        logger.info(json.dumps(message))
 
-    assert publisher.called
-    assert json.loads(call_args) == message
+    (msg,), config = producer.publish.call_args
+
+    assert json.loads(msg) == message
+    assert config['routing_key'] == routing_key
+    assert config['serializer'] == serializer
+    assert config['content_type'] == content_type
