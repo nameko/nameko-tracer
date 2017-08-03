@@ -22,11 +22,11 @@ class EntrypointAdapter(logging.LoggerAdapter):
     def process(self, message, kwargs):
         """ Extract useful entrypoint processing information
 
-        Extract useful entrypoint information and set it as ``data`` attr
-        of the log record. Content should be easily serialisable the most
-        probable formatter used would be JSON-like and the aim is to fill
-        ``data`` with something that can go easily over a wire and that can
-        be easily stored, filtered and searched.
+        Extract useful entrypoint information and set it as
+        ``constants.RECORD_ATTR`` named attribute of the log record.
+        Content of this attribute should be easily serialisable and the aim
+        is to fill it with something that can go easily over a wire and that
+        can be easily stored, filtered and searched.
 
         """
 

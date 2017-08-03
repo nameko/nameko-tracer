@@ -2,11 +2,15 @@ from enum import Enum
 
 
 class Stage(Enum):
+    """ Entrypoint stage
+    """
     request = 'request'
     response = 'response'
 
 
 class Status(Enum):
+    """ Entrypoint result status
+    """
     success = 'success'
     error = 'error'
 
@@ -19,58 +23,61 @@ of Nameko config.
 
 """
 
-RECORD_ATTR = 'data'
-""" Name of the log record attribute the gathered entrypoint data is set to
+RECORD_ATTR = 'details'
+""" Name of the log record attribute holding the serialisable details
 
-...
+Contains gathered entrypoint call and result details in serialisable
+and compact form.
 
 """
 
 
 TIMESTAMP_KEY = 'timestamp'
+""" A key holding the entrypoint stage timestamp
+"""
 
 
 STAGE_KEY = 'lifecycle_stage'
+""" A key holding the lifecycle stage (a value of one of ``Stage`` options)
+"""
 
 
 HOSTNAME_KEY = 'hostname'
+""" A key holding the service host name
+"""
 
 
 REQUEST_KEY = 'call_args'
-""" Entrypoint call arguments key
+""" A key holding a dictionary of arguments passed to the entrypoint call
+"""
 
-A key holding serialized tuple of args and kwargs passed to the entrypoint
-call.
+REQUEST_REDUCTED_KEY = 'call_args_redacted'
+"""
+A key holding a boolean value saying whether sensitive values of the
+entrypoint call arguments were redacted.
 
 """
 
-REQUEST_REDUCTED_KEY = 'call_args_reducted'
-
 RESPONSE_KEY = 'return_args'
-""" Entrypoint return key
-
-A key holding serialized return value of the entrypoint.
-
+""" A key holding serialisable return value of the entrypoint.
 """
 
 REQUEST_TRUNCATED_KEY = 'call_args_truncated'
-""" Set to ``True`` if the request data were truncated
-
-Set by ``TruncateRequestFilter`` if the data in ``REQUEST_KEY`` were
-truncated by the filter.
+"""
+A key holding a boolean value saying whether the call args data were
+truncated. Set by ``TruncateRequestFilter``.
 
 """
 
 RESPONSE_TRUNCATED_KEY = 'return_args_truncated'
-""" Set to ``True`` if the response data were truncated
-
-Set by ``TruncateResponseFilter`` if the data in ``RESPONSE_KEY`` were
-truncated by the filter.
+"""
+A key holding a boolean value saying whether the result data were truncated.
+Set by ``TruncateResponseFilter``.
 
 """
 
 REQUEST_LENGTH_KEY = 'call_args_bytes'
-""" Lenght of request data
+""" A key holding the original call args data length
 
 Set by ``TruncateRequestFilter`` to the original length of data in
 ``REQUEST_KEY``.
@@ -78,7 +85,7 @@ Set by ``TruncateRequestFilter`` to the original length of data in
 """
 
 RESPONSE_LENGTH_KEY = 'return_bytes'
-""" Lenght of response data
+""" A key holding the original result data length
 
 Set by ``TruncateResponseFilter`` to the original length of data in
 ``RESPONSE_KEY``.
@@ -86,31 +93,30 @@ Set by ``TruncateResponseFilter`` to the original length of data in
 """
 
 RESPONSE_STATUS_KEY = 'status'
+""" A key holding the result status (a value of one of ``Status`` options)
+"""
 
 
 RESPONSE_TIME_KEY = 'response_time'
+""" A key holding the amount of time taken between the two stages
+"""
 
 
 EXCEPTION_KEY = 'error'
+""" A key holding exception details if the entrypoint resulted into an error
+"""
 
 
 ENTRYPOINT_NAME_KEY = 'provider_name'
-""" Name of the entrypoint service method
-
-A key holding the entrypoint service method name e.g. ``'get_user'``.
-
+""" A key holding the entrypoint service method name e.g. ``'get_user'``
 """
 
 ENTRYPOINT_TYPE_KEY = ''
-""" Name of the entrypoint type
-
-A key holding the entrypoint type name e.g. ``'Rpc'``.
-
+""" A key holding the entrypoint type name e.g. ``'Rpc'``.
 """
 
 ENTRYPOINT_PATH = ''
-""" Entrypoint path
-
+"""
 A key holding the name of the service and the name of the entrypoint method
 e.g. ``'users.get_user'``.
 
