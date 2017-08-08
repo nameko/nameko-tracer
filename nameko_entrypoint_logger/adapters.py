@@ -79,15 +79,15 @@ class DefaultAdapter(logging.LoggerAdapter):
         """ Return serialisable call arguments
         """
 
-        provider = worker_ctx.entrypoint
+        entrypoint = worker_ctx.entrypoint
 
-        if getattr(provider, 'sensitive_variables', None):
+        if getattr(entrypoint, 'sensitive_variables', None):
             call_args = get_redacted_args(
-                provider, *worker_ctx.args, **worker_ctx.kwargs)
+                entrypoint, *worker_ctx.args, **worker_ctx.kwargs)
             redacted = True
         else:
             method = getattr(
-                provider.container.service_cls, provider.method_name)
+                entrypoint.container.service_cls, entrypoint.method_name)
             call_args = inspect.getcallargs(
                 method, None, *worker_ctx.args, **worker_ctx.kwargs)
             del call_args['self']
@@ -137,10 +137,10 @@ class HttpRequestHandlerAdapter(DefaultAdapter):
 
         # TODO: HttpRequestHandler should support sensitive_variables
 
-        provider = worker_ctx.entrypoint
+        entrypoint = worker_ctx.entrypoint
 
         method = getattr(
-            provider.container.service_cls, provider.method_name)
+            entrypoint.container.service_cls, entrypoint.method_name)
         call_args = inspect.getcallargs(
             method, None, *worker_ctx.args, **worker_ctx.kwargs)
         del call_args['self']
