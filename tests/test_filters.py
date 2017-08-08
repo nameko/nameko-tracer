@@ -25,7 +25,7 @@ def logger(handler):
     logger = logging.getLogger('test')
     logger.addHandler(handler)
     yield logger
-    for handller in logger.handlers:
+    for handler in logger.handlers:
         logger.removeHandler(handler)
     for filter_ in logger.filters:
         logger.removeFilter(filter_)
