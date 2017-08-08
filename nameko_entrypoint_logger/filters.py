@@ -20,7 +20,7 @@ class BaseTruncateFilter(logging.Filter, abc.ABC):
         self.max_len = max_len or 100
 
     def filter(self, log_record):
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
         lifecycle_stage = data.get(constants.STAGE_KEY)
         entrypoint_name = data.get(constants.ENTRYPOINT_NAME_KEY)
         if (
@@ -28,7 +28,7 @@ class BaseTruncateFilter(logging.Filter, abc.ABC):
             any(regex.match(entrypoint_name) for regex in self.entrypoints)
         ):
             data = self.truncate(data)
-            setattr(log_record, constants.RECORD_ATTR, data)
+            setattr(log_record, constants.TRACE_KEY, data)
         return log_record
 
     @abc.abstractmethod

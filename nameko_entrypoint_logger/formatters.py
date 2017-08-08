@@ -24,4 +24,4 @@ def dumps(obj):
 class JSONFormatter(logging.Formatter):
 
     def format(self, record):
-        return dumps(getattr(record, constants.RECORD_ATTR))
+        return dumps(getattr(record, constants.TRACE_KEY))

@@ -11,7 +11,7 @@ def test_json_serializer_will_deal_with_datetime():
     log_record = Mock()
     setattr(
         log_record,
-        constants.RECORD_ATTR,
+        constants.TRACE_KEY,
         {'datetime': datetime(2017, 7, 7, 12, 0)})
 
     assert (
@@ -22,7 +22,7 @@ def test_json_serializer_will_deal_with_datetime():
 def test_json_serializer_will_raise_value_error():
 
     log_record = Mock()
-    setattr(log_record, constants.RECORD_ATTR, {'weird_value': {None}})
+    setattr(log_record, constants.TRACE_KEY, {'weird_value': {None}})
 
     with pytest.raises(ValueError):
         formatters.JSONFormatter().format(log_record)

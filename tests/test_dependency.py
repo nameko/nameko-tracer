@@ -70,14 +70,14 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
     assert result_record.msg == 'entrypoint result trace'
     assert result_record.levelno == logging.INFO
 
-    setup_details = getattr(setup_record, constants.RECORD_ATTR)
+    setup_details = getattr(setup_record, constants.TRACE_KEY)
 
     assert setup_details[constants.TIMESTAMP_KEY] == setup_timestampt
     assert (
         setup_details[constants.STAGE_KEY] ==
         constants.Stage.request.value)
 
-    result_details = getattr(result_record, constants.RECORD_ATTR)
+    result_details = getattr(result_record, constants.TRACE_KEY)
 
     assert result_details[constants.TIMESTAMP_KEY] == result_timestamp
     assert result_details[constants.RESPONSE_TIME_KEY] == 60.0
@@ -125,14 +125,14 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
     assert result_record.msg == 'entrypoint result trace'
     assert result_record.levelno == logging.WARNING
 
-    setup_details = getattr(setup_record, constants.RECORD_ATTR)
+    setup_details = getattr(setup_record, constants.TRACE_KEY)
 
     assert setup_details[constants.TIMESTAMP_KEY] == setup_timestampt
     assert (
         setup_details[constants.STAGE_KEY] ==
         constants.Stage.request.value)
 
-    result_details = getattr(result_record, constants.RECORD_ATTR)
+    result_details = getattr(result_record, constants.TRACE_KEY)
 
     assert result_details[constants.TIMESTAMP_KEY] == result_timestamp
     assert result_details[constants.RESPONSE_TIME_KEY] == 60.0

@@ -24,7 +24,7 @@ class DefaultAdapter(logging.LoggerAdapter):
         """ Extract useful entrypoint processing information
 
         Extract useful entrypoint information and set it as
-        ``constants.RECORD_ATTR`` named attribute of the log record.
+        ``constants.TRACE_KEY`` named attribute of the log record.
         Content of this attribute should be easily serialisable and the aim
         is to fill it with something that can go easily over a wire and that
         can be easily stored, filtered and searched.
@@ -37,7 +37,7 @@ class DefaultAdapter(logging.LoggerAdapter):
 
         entrypoint = worker_ctx.entrypoint
 
-        data = kwargs['extra'].get(constants.RECORD_ATTR, {})
+        data = kwargs['extra'].get(constants.TRACE_KEY, {})
 
         data[constants.TIMESTAMP_KEY] = timestamp
         data[constants.SERVICE_NAME_KEY] = worker_ctx.service_name
@@ -82,7 +82,7 @@ class DefaultAdapter(logging.LoggerAdapter):
             data[constants.RESPONSE_TIME_KEY] = (
                 kwargs['extra']['response_time'])
 
-        kwargs['extra'][constants.RECORD_ATTR] = data
+        kwargs['extra'][constants.TRACE_KEY] = data
 
         return message, kwargs
 

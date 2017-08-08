@@ -101,7 +101,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['service'] == 'some-service'
         assert data['provider'] == 'Entrypoint'
@@ -136,7 +136,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['context_data'] == {
             LANGUAGE_CONTEXT_KEY: 'en-gb',
@@ -165,7 +165,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['call_args'] == {'spam': 'some-arg'}
         assert data['call_args_redacted'] is False
@@ -193,7 +193,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['call_args'] == {'spam': '********'}
         assert data['call_args_redacted'] is True
@@ -223,7 +223,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['return_args'] == expected_result_out
         assert data['status'] == constants.Status.success.value
@@ -249,7 +249,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert 'return_args' not in data
 
@@ -291,7 +291,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['error']['expected_error'] is False
 
@@ -320,7 +320,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['error']['expected_error'] is True
 
@@ -352,7 +352,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert 'return_args' not in data
 
@@ -418,7 +418,7 @@ class TestDefaultAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['return_args'] == {'some': 'data'}
         assert data['status'] == constants.Status.success.value
@@ -489,7 +489,7 @@ class TestHttpRequestHandlerAdapter:
 
         log_record = tracker.log_records[-1]
 
-        data = getattr(log_record, constants.RECORD_ATTR)
+        data = getattr(log_record, constants.TRACE_KEY)
 
         call_args = data['call_args']
 

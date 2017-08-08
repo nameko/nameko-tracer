@@ -23,7 +23,7 @@ of Nameko config.
 
 """
 
-RECORD_ATTR = 'entrypoint_trace'
+TRACE_KEY = 'entrypoint_trace'
 """ Name of the log record attribute holding the serialisable details
 
 Contains gathered entrypoint call and result details in serialisable

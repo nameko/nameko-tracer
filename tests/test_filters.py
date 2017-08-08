@@ -58,7 +58,7 @@ def test_truncate_request(
     logger.addFilter(filter_)
 
     extra = {
-        constants.RECORD_ATTR: {
+        constants.TRACE_KEY: {
             constants.STAGE_KEY: constants.Stage.request.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.REQUEST_KEY: '123456789',
@@ -67,7 +67,7 @@ def test_truncate_request(
 
     logger.info('request', extra=extra)
 
-    data = getattr(handler.log_record, constants.RECORD_ATTR)
+    data = getattr(handler.log_record, constants.TRACE_KEY)
 
     assert data[constants.REQUEST_KEY] == expected_request
     assert data.get(constants.REQUEST_TRUNCATED_KEY, False) == truncated
@@ -101,7 +101,7 @@ def test_truncate_response(
     logger.addFilter(filter_)
 
     extra = {
-        constants.RECORD_ATTR: {
+        constants.TRACE_KEY: {
             constants.STAGE_KEY: constants.Stage.response.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.RESPONSE_KEY: '123456789',
@@ -110,7 +110,7 @@ def test_truncate_response(
 
     logger.info('response', extra=extra)
 
-    data = getattr(handler.log_record, constants.RECORD_ATTR)
+    data = getattr(handler.log_record, constants.TRACE_KEY)
 
     assert data[constants.RESPONSE_KEY] == expected_response
     assert data.get(constants.RESPONSE_TRUNCATED_KEY, False) == truncated
@@ -124,7 +124,7 @@ def test_truncate_request_ignores_response_data(handler, logger):
     logger.addFilter(filter_)
 
     extra = {
-        constants.RECORD_ATTR: {
+        constants.TRACE_KEY: {
             constants.STAGE_KEY: constants.Stage.response.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.RESPONSE_KEY: '123456789',
@@ -133,7 +133,7 @@ def test_truncate_request_ignores_response_data(handler, logger):
 
     logger.info('response', extra=extra)
 
-    data = getattr(handler.log_record, constants.RECORD_ATTR)
+    data = getattr(handler.log_record, constants.TRACE_KEY)
 
     assert data[constants.RESPONSE_KEY] == '123456789'
     assert constants.REQUEST_TRUNCATED_KEY not in data
@@ -149,7 +149,7 @@ def test_truncate_response_ignores_request_data(handler, logger):
     logger.addFilter(filter_)
 
     extra = {
-        constants.RECORD_ATTR: {
+        constants.TRACE_KEY: {
             constants.STAGE_KEY: constants.Stage.request.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.REQUEST_KEY: '123456789',
@@ -158,7 +158,7 @@ def test_truncate_response_ignores_request_data(handler, logger):
 
     logger.info('request', extra=extra)
 
-    data = getattr(handler.log_record, constants.RECORD_ATTR)
+    data = getattr(handler.log_record, constants.TRACE_KEY)
 
     assert data[constants.REQUEST_KEY] == '123456789'
     assert constants.RESPONSE_TRUNCATED_KEY not in data
