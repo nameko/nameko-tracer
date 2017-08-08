@@ -165,3 +165,8 @@ def test_truncate_response_ignores_request_data(handler, logger):
     assert constants.RESPONSE_LENGTH_KEY not in data
     assert constants.REQUEST_TRUNCATED_KEY not in data
     assert constants.REQUEST_LENGTH_KEY not in data
+
+
+def test_base_truncate_filter_cannot_be_used(handler, logger):
+    with pytest.raises(TypeError):
+        filters.BaseTruncateFilter(entrypoints=['^spam'], max_len=5)

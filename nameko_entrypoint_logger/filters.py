@@ -1,3 +1,4 @@
+import abc
 import logging
 import re
 
@@ -5,7 +6,7 @@ import re
 from nameko_entrypoint_logger import constants, utils
 
 
-class BaseTruncateFilter(logging.Filter):
+class BaseTruncateFilter(logging.Filter, abc.ABC):
 
     default_entrypoints = []
 
@@ -26,12 +27,14 @@ class BaseTruncateFilter(logging.Filter):
             lifecycle_stage == self.lifecycle_stage.value and
             any(regex.match(entrypoint_name) for regex in self.entrypoints)
         ):
-            data = self._filter(data)
+            data = self.truncate(data)
             setattr(log_record, constants.RECORD_ATTR, data)
         return log_record
 
-    def _filter(self, data):
-        raise NotImplementedError()  # pragma: no cover
+    @abc.abstractmethod
+    def truncate(self, data):
+        """ Truncate and return the data
+        """
 
 
 class TruncateRequestFilter(BaseTruncateFilter):
@@ -46,7 +49,7 @@ class TruncateRequestFilter(BaseTruncateFilter):
 
     lifecycle_stage = constants.Stage.request
 
-    def _filter(self, data):
+    def truncate(self, data):
         call_args = utils.to_string(data[constants.REQUEST_KEY])
         length = len(call_args)
         if length > self.max_len:
@@ -72,7 +75,7 @@ class TruncateResponseFilter(BaseTruncateFilter):
 
     lifecycle_stage = constants.Stage.response
 
-    def _filter(self, data):
+    def truncate(self, data):
         result = utils.to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:
