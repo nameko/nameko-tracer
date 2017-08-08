@@ -43,7 +43,7 @@ def test_handler_will_publish_log_message(producers, connections):
 @patch('nameko_entrypoint_logger.handlers.logger')
 @patch('nameko_entrypoint_logger.handlers.connections')
 @patch('nameko_entrypoint_logger.handlers.producers')
-def test_handler_will_fial_with_logging_the_error(
+def test_handler_will_fail_with_logging_the_error(
     producers, connections, module_logger
 ):
 

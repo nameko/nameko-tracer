@@ -37,11 +37,15 @@ def logger(handler):
         'expected_request_length', 'truncated',
     ),
     (
+        # should truncate call args of 'spam' entrypoint
         (['spam'], 5, '12345', 9, True),
         (['^ham|spam'], 5, '12345', 9, True),
         (['^spam'], 5, '12345', 9, True),
+        # call args of 'spam' entrypoint shorter than max len
         (['^spam'], 10, '123456789', 9, False),
+        # 'spam' entrypoint does not match the regexp
         (['^ham'], 5, '123456789', None, False),
+        # no entrypoint should be truncated
         (None, 5, '123456789', None, False),
         ([], 5, '123456789', None, False),
         ('', 5, '123456789', None, False),
