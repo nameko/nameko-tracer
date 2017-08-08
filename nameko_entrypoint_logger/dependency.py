@@ -38,11 +38,12 @@ class EntrypointLogger(DependencyProvider):
             adapter_class = utils.import_by_path(adapter_path)
             self.custom_adapters[entrypoint_class] = adapter_class
 
-    def adapter_factory(self, entrypoint_class, extra):
+    def adapter_factory(self, entrypoint_class):
         if entrypoint_class in self.custom_adapters:
             adapter_class = self.custom_adapters[entrypoint_class]
         else:
             adapter_class = adapters.DefaultAdapter
+        extra = {constants.HOSTNAME_KEY: socket.gethostname()}
         return adapter_class(self.logger, extra=extra)
 
     def get_adapter(self, worker_ctx):
@@ -50,8 +51,7 @@ class EntrypointLogger(DependencyProvider):
         try:
             return self.adapters[key]
         except KeyError:
-            extra = {constants.HOSTNAME_KEY: socket.gethostname()}
-            self.adapters[key] = self.adapter_factory(key, extra)
+            self.adapters[key] = self.adapter_factory(key)
             return self.adapters[key]
 
     def worker_setup(self, worker_ctx):
