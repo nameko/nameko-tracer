@@ -396,7 +396,7 @@ class TestDefaultAdapter:
 
         return entrypoint, worker_context
 
-    def test_various_entrypoints(self, adapter, entrypoint, tracker):
+    def test_amqp_entrypoints(self, adapter, entrypoint, tracker):
 
         entrypoint, worker_ctx = entrypoint
 
