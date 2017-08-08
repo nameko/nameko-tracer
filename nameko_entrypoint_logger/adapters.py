@@ -135,8 +135,6 @@ class HttpRequestHandlerAdapter(DefaultAdapter):
         """ Transform request object to serialized dictionary
         """
 
-        # TODO: HttpRequestHandler should support sensitive_variables
-
         entrypoint = worker_ctx.entrypoint
 
         method = getattr(
