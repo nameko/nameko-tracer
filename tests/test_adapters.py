@@ -49,7 +49,7 @@ def logger(tracker):
     return logger
 
 
-class TestEntrypointAdapter:
+class TestDefaultAdapter:
 
     @pytest.fixture
     def container(self, container_factory, rabbit_config, service_class):
@@ -77,7 +77,7 @@ class TestEntrypointAdapter:
 
     @pytest.fixture
     def adapter(self, logger):
-        adapter = adapters.EntrypointAdapter(logger, extra={})
+        adapter = adapters.DefaultAdapter(logger, extra={})
         return adapter
 
     @pytest.mark.parametrize(

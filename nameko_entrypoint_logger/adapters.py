@@ -1,3 +1,4 @@
+import abc
 import inspect
 import logging
 from traceback import format_exception
@@ -17,7 +18,7 @@ from nameko_entrypoint_logger import constants, utils
 logger = logging.getLogger(__name__)
 
 
-class EntrypointAdapter(logging.LoggerAdapter):
+class DefaultAdapter(logging.LoggerAdapter):
 
     def process(self, message, kwargs):
         """ Extract useful entrypoint processing information
@@ -139,7 +140,7 @@ class EntrypointAdapter(logging.LoggerAdapter):
         }
 
 
-class HttpRequestHandlerAdapter(EntrypointAdapter):
+class HttpRequestHandlerAdapter(DefaultAdapter):
 
     def get_call_args(self, worker_ctx):
         """ Transform request object to serialized dictionary

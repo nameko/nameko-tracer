@@ -163,7 +163,7 @@ def test_erroring_setup_adapter(container_factory, tracker):
     container.start()
 
     with patch(
-        'nameko_entrypoint_logger.adapters.EntrypointAdapter.info'
+        'nameko_entrypoint_logger.adapters.DefaultAdapter.info'
     ) as info:
         with patch('nameko_entrypoint_logger.dependency.logger') as logger:
             info.side_effect = [
@@ -200,7 +200,7 @@ def test_erroring_result_adapter(container_factory, tracker):
     container.start()
 
     with patch(
-        'nameko_entrypoint_logger.adapters.EntrypointAdapter.info'
+        'nameko_entrypoint_logger.adapters.DefaultAdapter.info'
     ) as info:
         with patch('nameko_entrypoint_logger.dependency.logger') as logger:
             info.side_effect = [
@@ -218,7 +218,7 @@ def test_erroring_result_adapter(container_factory, tracker):
         'Failed to log entrypoint trace', exc_info=True)
 
 
-@patch('nameko_entrypoint_logger.adapters.EntrypointAdapter.info')
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 def test_adapters_reused(info, mock_container):
 
     mock_container.service_name = 'dummy'
@@ -244,12 +244,12 @@ def test_adapters_reused(info, mock_container):
         assert DummyProvider in entrypoint_logger.adapters
         assert isinstance(
             entrypoint_logger.adapters[DummyProvider],
-            adapters.EntrypointAdapter)
+            adapters.DefaultAdapter)
 
     assert info.call_count == 4
 
 
-@patch('nameko_entrypoint_logger.adapters.EntrypointAdapter.info')
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 @patch('nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter.info')
 def test_default_adapter_overrides(default_info, http_info, mock_container):
 
@@ -280,7 +280,7 @@ def test_default_adapter_overrides(default_info, http_info, mock_container):
         assert DummyProvider in entrypoint_logger.adapters
         assert isinstance(
             entrypoint_logger.adapters[DummyProvider],
-            adapters.EntrypointAdapter)
+            adapters.DefaultAdapter)
 
         assert HttpRequestHandler in entrypoint_logger.adapters
         assert isinstance(
@@ -291,11 +291,11 @@ def test_default_adapter_overrides(default_info, http_info, mock_container):
     assert http_info.call_count == 4
 
 
-class SomeAdapter(adapters.EntrypointAdapter):
+class SomeAdapter(adapters.DefaultAdapter):
     pass
 
 
-@patch('nameko_entrypoint_logger.adapters.EntrypointAdapter.info')
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 @patch.object(SomeAdapter, 'info')
 def test_config_adapter_overrides(default_info, some_info, mock_container):
 
@@ -333,7 +333,7 @@ def test_config_adapter_overrides(default_info, some_info, mock_container):
         assert DummyProvider in entrypoint_logger.adapters
         assert isinstance(
             entrypoint_logger.adapters[DummyProvider],
-            adapters.EntrypointAdapter)
+            adapters.DefaultAdapter)
 
         assert HttpRequestHandler in entrypoint_logger.adapters
         assert isinstance(

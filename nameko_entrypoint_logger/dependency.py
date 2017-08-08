@@ -43,7 +43,7 @@ class EntrypointLogger(DependencyProvider):
         if entrypoint_class in self.adapter_overrides:
             adapter_class = self.adapter_overrides[entrypoint_class]
         else:
-            adapter_class = adapters.EntrypointAdapter
+            adapter_class = adapters.DefaultAdapter
         return adapter_class(self.logger, extra=extra)
 
     def get_adapter(self, worker_ctx):
