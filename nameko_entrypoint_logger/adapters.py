@@ -51,7 +51,7 @@ class DefaultAdapter(logging.LoggerAdapter):
 
         call_args, call_args_redacted = self.get_call_args(worker_ctx)
         data[constants.REQUEST_KEY] = call_args
-        data[constants.REQUEST_REDUCTED_KEY] = call_args_redacted
+        data[constants.REQUEST_REDACTED_KEY] = call_args_redacted
 
         if stage == constants.Stage.response:
 

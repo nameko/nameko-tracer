@@ -51,7 +51,7 @@ REQUEST_KEY = 'call_args'
 """ A key holding a dictionary of arguments passed to the entrypoint call
 """
 
-REQUEST_REDUCTED_KEY = 'call_args_redacted'
+REQUEST_REDACTED_KEY = 'call_args_redacted'
 """
 A key holding a boolean value saying whether sensitive values of the
 entrypoint call arguments were redacted.
