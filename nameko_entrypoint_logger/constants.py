@@ -133,6 +133,10 @@ CALL_ID_STACK_KEY = 'call_stack'
 """ A key holding the call ID stack ...
 """
 
+CONTENT_DATA_KEY = 'context_data'
+""" A key holding the worker context data dictionary
+"""
+
 ADAPTER_OVERRIDES = {
     'nameko.web.handlers.HttpRequestHandler': (
         'nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter'),

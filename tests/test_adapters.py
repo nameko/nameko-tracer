@@ -6,11 +6,6 @@ import logging.handlers
 from kombu import Exchange, Queue
 from mock import patch
 from nameko.containers import WorkerContext
-from nameko.contextdata import (
-    LANGUAGE_CONTEXT_KEY,
-    USER_AGENT_CONTEXT_KEY,
-    USER_ID_CONTEXT_KEY,
-)
 from nameko.events import EventHandler, event_handler
 from nameko.messaging import Consumer, consume
 from nameko.rpc import rpc, Rpc
@@ -120,9 +115,10 @@ class TestDefaultAdapter:
     ):
 
         worker_ctx.data = {
-            LANGUAGE_CONTEXT_KEY: 'en-gb',
-            'some-other-key': 'should-be-ignored',
+            'some-key': 'simple-data',
+            'some-other-key': {'a bit more': ['complex data', 1, None]},
         }
+
         extra = {
             'stage': stage,
             'worker_ctx': worker_ctx,
@@ -138,11 +134,10 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['context_data'] == {
-            LANGUAGE_CONTEXT_KEY: 'en-gb',
-            USER_ID_CONTEXT_KEY: None,
-            USER_AGENT_CONTEXT_KEY: None,
-        }
+        assert data['context_data']['some-key'] == 'simple-data'
+        assert (
+            data['context_data']['some-other-key'] ==
+            {'a bit more': ['complex data', '1', 'None']})
 
     @pytest.mark.parametrize(
         'stage',

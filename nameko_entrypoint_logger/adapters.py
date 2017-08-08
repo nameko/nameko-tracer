@@ -3,11 +3,6 @@ import inspect
 import logging
 from traceback import format_exception
 
-from nameko.constants import (
-    LANGUAGE_CONTEXT_KEY,
-    USER_AGENT_CONTEXT_KEY,
-    USER_ID_CONTEXT_KEY,
-)
 from nameko.exceptions import safe_for_serialization, serialize
 from nameko.utils import get_redacted_args
 import six
@@ -44,16 +39,10 @@ class DefaultAdapter(logging.LoggerAdapter):
         data[constants.ENTRYPOINT_TYPE_KEY] = type(entrypoint).__name__
         data[constants.ENTRYPOINT_NAME_KEY] = entrypoint.method_name
         data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
-                worker_ctx.service_name, entrypoint.method_name)
+            worker_ctx.service_name, entrypoint.method_name)
 
-        data['context_data'] = {
-            LANGUAGE_CONTEXT_KEY: worker_ctx.data.get(
-                LANGUAGE_CONTEXT_KEY),
-            USER_AGENT_CONTEXT_KEY: worker_ctx.data.get(
-                USER_AGENT_CONTEXT_KEY),
-            USER_ID_CONTEXT_KEY: worker_ctx.data.get(
-                USER_ID_CONTEXT_KEY),
-        }
+        data[constants.CONTENT_DATA_KEY] = safe_for_serialization(
+            worker_ctx.data)
 
         data[constants.CALL_ID_KEY] = worker_ctx.call_id
         data[constants.CALL_ID_STACK_KEY] = worker_ctx.call_id_stack
