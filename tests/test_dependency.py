@@ -251,7 +251,7 @@ def test_adapters_reused(info, mock_container):
 
 @patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 @patch('nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter.info')
-def test_default_adapter_overrides(default_info, http_info, mock_container):
+def test_default_adapters(default_info, http_info, mock_container):
 
     mock_container.service_name = 'dummy'
     mock_container.config = {}
@@ -297,7 +297,7 @@ class SomeAdapter(adapters.DefaultAdapter):
 
 @patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 @patch.object(SomeAdapter, 'info')
-def test_config_adapter_overrides(default_info, some_info, mock_container):
+def test_config_adapters(default_info, some_info, mock_container):
 
     mock_container.service_name = 'dummy'
     mock_container.config = {

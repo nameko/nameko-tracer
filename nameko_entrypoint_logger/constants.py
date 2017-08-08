@@ -137,7 +137,7 @@ CONTENT_DATA_KEY = 'context_data'
 """ A key holding the worker context data dictionary
 """
 
-ADAPTER_OVERRIDES = {
+DEFAULT_ADAPTERS = {
     'nameko.web.handlers.HttpRequestHandler': (
         'nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter'),
 }

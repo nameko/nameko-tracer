@@ -21,27 +21,26 @@ class EntrypointLogger(DependencyProvider):
     def __init__(self):
         self.logger = None
         self.adapters = {}
-        self.adapter_overrides = {}
+        self.custom_adapters = {}
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
         config = self.container.config.get(constants.CONFIG_KEY, {})
 
-        self.update_adapter_overrides(constants.ADAPTER_OVERRIDES)
-        self.update_adapter_overrides(
-            config.get(constants.ADAPTERS_CONFIG_KEY, {}))
+        self.update_adapters(constants.DEFAULT_ADAPTERS)
+        self.update_adapters(config.get(constants.ADAPTERS_CONFIG_KEY, {}))
 
         self.logger = logging.getLogger(constants.LOGGER_NAME)
 
-    def update_adapter_overrides(self, adapter_overrides_config):
-        for entrypoint_path, adapter_path in adapter_overrides_config.items():
+    def update_adapters(self, adapters_config):
+        for entrypoint_path, adapter_path in adapters_config.items():
             entrypoint_class = utils.import_by_path(entrypoint_path)
             adapter_class = utils.import_by_path(adapter_path)
-            self.adapter_overrides[entrypoint_class] = adapter_class
+            self.custom_adapters[entrypoint_class] = adapter_class
 
     def adapter_factory(self, entrypoint_class, extra):
-        if entrypoint_class in self.adapter_overrides:
-            adapter_class = self.adapter_overrides[entrypoint_class]
+        if entrypoint_class in self.custom_adapters:
+            adapter_class = self.custom_adapters[entrypoint_class]
         else:
             adapter_class = adapters.DefaultAdapter
         return adapter_class(self.logger, extra=extra)
