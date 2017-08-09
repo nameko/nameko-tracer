@@ -1,6 +1,7 @@
+from collections import defaultdict
+from datetime import datetime
 import logging
 import socket
-from datetime import datetime
 from weakref import WeakKeyDictionary
 
 from nameko.extensions import DependencyProvider
@@ -21,28 +22,26 @@ class EntrypointLogger(DependencyProvider):
     def __init__(self):
         self.logger = None
         self.adapters = {}
-        self.custom_adapters = {}
+        self.adapter_types = defaultdict(lambda:adapters.DefaultAdapter)
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
         config = self.container.config.get(constants.CONFIG_KEY, {})
 
-        self.configure_adapters(constants.DEFAULT_ADAPTERS)
-        self.configure_adapters(config.get(constants.ADAPTERS_CONFIG_KEY, {}))
+        self.configure_adapter_types(constants.DEFAULT_ADAPTERS)
+        self.configure_adapter_types(
+            config.get(constants.ADAPTERS_CONFIG_KEY, {}))
 
         self.logger = logging.getLogger(constants.LOGGER_NAME)
 
-    def configure_adapters(self, adapters_config):
+    def configure_adapter_types(self, adapters_config):
         for entrypoint_path, adapter_path in adapters_config.items():
             entrypoint_class = utils.import_by_path(entrypoint_path)
             adapter_class = utils.import_by_path(adapter_path)
-            self.custom_adapters[entrypoint_class] = adapter_class
+            self.adapter_types[entrypoint_class] = adapter_class
 
     def adapter_factory(self, entrypoint_class):
-        if entrypoint_class in self.custom_adapters:
-            adapter_class = self.custom_adapters[entrypoint_class]
-        else:
-            adapter_class = adapters.DefaultAdapter
+        adapter_class = self.adapter_types[entrypoint_class]
         extra = {constants.HOSTNAME_KEY: socket.gethostname()}
         return adapter_class(self.logger, extra=extra)
 
