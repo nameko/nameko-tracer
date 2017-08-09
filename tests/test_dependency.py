@@ -144,7 +144,9 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
         constants.Status.error.value)
 
 
-def test_erroring_setup_adapter(container_factory, tracker):
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
+@patch('nameko_entrypoint_logger.dependency.logger')
+def test_erroring_setup_adapter(logger, info, container_factory, tracker):
 
     class SomeError(Exception):
         pass
@@ -162,16 +164,12 @@ def test_erroring_setup_adapter(container_factory, tracker):
     container = container_factory(Service, {})
     container.start()
 
-    with patch(
-        'nameko_entrypoint_logger.adapters.DefaultAdapter.info'
-    ) as info:
-        with patch('nameko_entrypoint_logger.dependency.logger') as logger:
-            info.side_effect = [
-                SomeError('Yo!'),
-                None
-            ]
-            with entrypoint_hook(container, 'some_method') as some_method:
-                some_method('ham')
+	info.side_effect = [
+		SomeError('Yo!'),
+		None
+	]
+	with entrypoint_hook(container, 'some_method') as some_method:
+		some_method('ham')
 
     # nothing logged by entrypoint logger
     assert len(tracker.log_records) == 0
@@ -181,7 +179,9 @@ def test_erroring_setup_adapter(container_factory, tracker):
         'Failed to log entrypoint trace', exc_info=True)
 
 
-def test_erroring_result_adapter(container_factory, tracker):
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
+@patch('nameko_entrypoint_logger.dependency.logger')
+def test_erroring_result_adapter(logger, info, container_factory, tracker):
 
     class SomeError(Exception):
         pass
@@ -199,16 +199,12 @@ def test_erroring_result_adapter(container_factory, tracker):
     container = container_factory(Service, {})
     container.start()
 
-    with patch(
-        'nameko_entrypoint_logger.adapters.DefaultAdapter.info'
-    ) as info:
-        with patch('nameko_entrypoint_logger.dependency.logger') as logger:
-            info.side_effect = [
-                Mock(return_value=(Mock(), Mock())),
-                SomeError('Yo!')
-            ]
-            with entrypoint_hook(container, 'some_method') as some_method:
-                some_method('ham')
+    info.side_effect = [
+        Mock(return_value=(Mock(), Mock())),
+        SomeError('Yo!')
+    ]
+    with entrypoint_hook(container, 'some_method') as some_method:
+        some_method('ham')
 
     # nothing logged by entrypoint logger
     assert len(tracker.log_records) == 0
@@ -291,20 +287,20 @@ def test_default_adapters(default_info, http_info, mock_container):
     assert http_info.call_count == 4
 
 
-class SomeAdapter(adapters.DefaultAdapter):
+class CustomAdapter(adapters.DefaultAdapter):
     pass
 
 
 @patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
-@patch.object(SomeAdapter, 'info')
-def test_config_adapters(default_info, some_info, mock_container):
+@patch.object(CustomAdapter, 'info')
+def test_config_adapters(default_info, custom_info, mock_container):
 
     mock_container.service_name = 'dummy'
     mock_container.config = {
         constants.CONFIG_KEY: {
             constants.ADAPTERS_CONFIG_KEY: {
                 'nameko.web.handlers.HttpRequestHandler':
-                    'test_dependency.SomeAdapter',
+                    'test_dependency.CustomAdapter',
             }
         }
     }
@@ -338,7 +334,7 @@ def test_config_adapters(default_info, some_info, mock_container):
         assert HttpRequestHandler in entrypoint_logger.adapters
         assert isinstance(
             entrypoint_logger.adapters[HttpRequestHandler],
-            SomeAdapter)
+            CustomAdapter)
 
     assert default_info.call_count == 4
-    assert some_info.call_count == 4
+    assert custom_info.call_count == 4
