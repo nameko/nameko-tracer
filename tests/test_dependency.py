@@ -164,12 +164,12 @@ def test_erroring_setup_adapter(logger, info, container_factory, tracker):
     container = container_factory(Service, {})
     container.start()
 
-	info.side_effect = [
-		SomeError('Yo!'),
-		None
-	]
-	with entrypoint_hook(container, 'some_method') as some_method:
-		some_method('ham')
+    info.side_effect = [
+        SomeError('Yo!'),
+        None
+    ]
+    with entrypoint_hook(container, 'some_method') as some_method:
+        some_method('ham')
 
     # nothing logged by entrypoint logger
     assert len(tracker.log_records) == 0

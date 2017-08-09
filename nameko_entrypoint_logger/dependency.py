@@ -27,12 +27,12 @@ class EntrypointLogger(DependencyProvider):
     def setup(self):
         config = self.container.config.get(constants.CONFIG_KEY, {})
 
-        self.update_adapters(constants.DEFAULT_ADAPTERS)
-        self.update_adapters(config.get(constants.ADAPTERS_CONFIG_KEY, {}))
+        self.configure_adapters(constants.DEFAULT_ADAPTERS)
+        self.configure_adapters(config.get(constants.ADAPTERS_CONFIG_KEY, {}))
 
         self.logger = logging.getLogger(constants.LOGGER_NAME)
 
-    def update_adapters(self, adapters_config):
+    def configure_adapters(self, adapters_config):
         for entrypoint_path, adapter_path in adapters_config.items():
             entrypoint_class = utils.import_by_path(entrypoint_path)
             adapter_class = utils.import_by_path(adapter_path)
