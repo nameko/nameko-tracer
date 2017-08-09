@@ -124,7 +124,7 @@ class DefaultAdapter(logging.LoggerAdapter):
             'exc_type': exc_info[0].__name__,
             'exc': utils.to_string(exc_repr),
             'traceback': exc_traceback,
-            'expected_error': is_expected,
+            'expected_exception': is_expected,
         }
 
 

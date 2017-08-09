@@ -256,7 +256,7 @@ class TestDefaultAdapter:
 
         assert data['error']['exc_type'] == 'Error'
         assert 'Error: Yo!' in data['error']['traceback']
-        assert data['error']['expected_error'] is False
+        assert data['error']['expected_exception'] is False
 
         assert data['status'] == constants.Status.error.value
 
@@ -288,7 +288,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['expected_error'] is False
+        assert data['error']['expected_exception'] is False
 
     def test_error_data_expected_exception(
         self, adapter, tracker, worker_ctx
@@ -317,7 +317,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['expected_error'] is True
+        assert data['error']['expected_exception'] is True
 
     @patch('nameko_entrypoint_logger.adapters.serialize')
     @patch('nameko_entrypoint_logger.adapters.format_exception')
@@ -354,7 +354,7 @@ class TestDefaultAdapter:
         assert data['error']['exc'] == 'exception serialization failed'
         assert data['error']['traceback'] == 'traceback serialization failed'
         assert data['error']['exc_type'] == 'Error'
-        assert data['error']['expected_error'] is False
+        assert data['error']['expected_exception'] is False
 
         assert data['status'] == constants.Status.error.value
 
