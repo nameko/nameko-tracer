@@ -43,6 +43,12 @@ class TruncateRequestFilter(BaseTruncateFilter):
     If the truncation is applied, the call data is serialised to string
     beforehand.
 
+    Example of a filter truncating call arguments of entrypoint methods
+    starting with "create" or "insert" to the length of 200 characters::
+
+        filter = TruncateRequestFilter(
+            entrypoints=['^create|^insert'], max_len=200)
+
     """
 
     default_entrypoints = []
@@ -68,6 +74,12 @@ class TruncateResponseFilter(BaseTruncateFilter):
 
     If the truncation is applied, the call data is serialised to string
     beforehand.
+
+    Example of a filter truncating return value of entrypoint methods
+    starting with "get" or "list" to the length of 200 characters::
+
+        filter = TruncateResponseFilter(
+            entrypoints=['^get|^list'], max_len=200)
 
     """
 
