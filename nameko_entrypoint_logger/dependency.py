@@ -22,7 +22,7 @@ class EntrypointLogger(DependencyProvider):
     def __init__(self):
         self.logger = None
         self.adapters = {}
-        self.adapter_types = defaultdict(lambda:adapters.DefaultAdapter)
+        self.adapter_types = defaultdict(lambda: adapters.DefaultAdapter)
         self.worker_timestamps = WeakKeyDictionary()
 
     def setup(self):
