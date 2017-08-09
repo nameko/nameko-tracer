@@ -40,10 +40,10 @@ def mocked_datetime():
 
 def test_successful_result(container_factory, mocked_datetime, tracker):
 
-    request_timestampt = datetime(2017, 7, 7, 12, 0, 0)
+    request_timestamp = datetime(2017, 7, 7, 12, 0, 0)
     response_timestamp = datetime(2017, 7, 7, 12, 1, 0)
     mocked_datetime.utcnow.side_effect = [
-        request_timestampt, response_timestamp]
+        request_timestamp, response_timestamp]
 
     class Service(object):
 
@@ -72,7 +72,7 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
 
     setup_details = getattr(setup_record, constants.TRACE_KEY)
 
-    assert setup_details[constants.TIMESTAMP_KEY] == request_timestampt
+    assert setup_details[constants.TIMESTAMP_KEY] == request_timestamp
     assert (
         setup_details[constants.STAGE_KEY] ==
         constants.Stage.request.value)
@@ -91,10 +91,10 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
 
 def test_failing_result(container_factory, mocked_datetime, tracker):
 
-    request_timestampt = datetime(2017, 7, 7, 12, 0, 0)
+    request_timestamp = datetime(2017, 7, 7, 12, 0, 0)
     response_timestamp = datetime(2017, 7, 7, 12, 1, 0)
     mocked_datetime.utcnow.side_effect = [
-        request_timestampt, response_timestamp]
+        request_timestamp, response_timestamp]
 
     class SomeError(Exception):
         pass
@@ -127,7 +127,7 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
 
     setup_details = getattr(setup_record, constants.TRACE_KEY)
 
-    assert setup_details[constants.TIMESTAMP_KEY] == request_timestampt
+    assert setup_details[constants.TIMESTAMP_KEY] == request_timestamp
     assert (
         setup_details[constants.STAGE_KEY] ==
         constants.Stage.request.value)
