@@ -3,11 +3,14 @@ machine:
     version: 3.4.3
 
 dependencies:
-  pre:
-    - pip install -U pip wheel setuptools
-    - pip install ".[dev]"
+  override:
+    - pip install tox tox-pyenv
+    - pyenv local 2.7.10 3.4.3
+    - pip install -U pip setuptools
+    - pip install -U -e ".[dev]"
 
 test:
-    override:
-      - coverage run --concurrency=eventlet --source nameko_entrypoint_logger -m pytest tests
-      - coverage html -d $CIRCLE_ARTIFACTS --fail-under 100
+  override:
+    - make test
+  post:
+    - coverage html -d $CIRCLE_ARTIFACTS
