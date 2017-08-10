@@ -21,7 +21,6 @@ class EntrypointLogger(DependencyProvider):
 
     def __init__(self):
         self.logger = None
-        self.adapters = {}
         self.adapter_types = defaultdict(lambda: adapters.DefaultAdapter)
         self.worker_timestamps = WeakKeyDictionary()
 
@@ -40,18 +39,10 @@ class EntrypointLogger(DependencyProvider):
             adapter_class = utils.import_by_path(adapter_path)
             self.adapter_types[entrypoint_class] = adapter_class
 
-    def adapter_factory(self, entrypoint_class):
-        adapter_class = self.adapter_types[entrypoint_class]
+    def adapter_factory(self, worker_ctx):
+        adapter_class = self.adapter_types[type(worker_ctx.entrypoint)]
         extra = {constants.HOSTNAME_KEY: socket.gethostname()}
         return adapter_class(self.logger, extra=extra)
-
-    def get_adapter(self, worker_ctx):
-        key = type(worker_ctx.entrypoint)
-        try:
-            return self.adapters[key]
-        except KeyError:
-            self.adapters[key] = self.adapter_factory(key)
-            return self.adapters[key]
 
     def worker_setup(self, worker_ctx):
         """ Log entrypoint call details
@@ -66,7 +57,7 @@ class EntrypointLogger(DependencyProvider):
                 'worker_ctx': worker_ctx,
                 'timestamp': timestamp,
             }
-            adapter = self.get_adapter(worker_ctx)
+            adapter = self.adapter_factory(worker_ctx)
             adapter.info('entrypoint call trace', extra=extra)
         except Exception:
             logger.warning('Failed to log entrypoint trace', exc_info=True)
@@ -88,7 +79,7 @@ class EntrypointLogger(DependencyProvider):
                 'timestamp': timestamp,
                 'response_time': response_time,
             }
-            adapter = self.get_adapter(worker_ctx)
+            adapter = self.adapter_factory(worker_ctx)
             if exc_info:
                 adapter.warning('entrypoint result trace', extra=extra)
             else:

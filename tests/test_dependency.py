@@ -214,39 +214,8 @@ def test_erroring_result_adapter(logger, info, container_factory, tracker):
         'Failed to log entrypoint trace', exc_info=True)
 
 
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
-def test_adapters_reused(info, mock_container):
-
-    mock_container.service_name = 'dummy'
-    mock_container.config = {}
-    entrypoint_logger = EntrypointLogger().bind(mock_container, 'logger')
-    entrypoint_logger.setup()
-
-    worker_ctx = WorkerContext(mock_container, None, DummyProvider())
-
-    assert entrypoint_logger.adapters == {}
-
-    calls = [
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result,
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result
-    ]
-
-    for call_ in calls:
-        call_(worker_ctx)
-
-        assert len(entrypoint_logger.adapters) == 1
-        assert DummyProvider in entrypoint_logger.adapters
-        assert isinstance(
-            entrypoint_logger.adapters[DummyProvider],
-            adapters.DefaultAdapter)
-
-    assert info.call_count == 4
-
-
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 @patch('nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter.info')
+@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
 def test_default_adapters(default_info, http_info, mock_container):
 
     mock_container.service_name = 'dummy'
@@ -258,8 +227,6 @@ def test_default_adapters(default_info, http_info, mock_container):
     http_worker_ctx = WorkerContext(
         mock_container, None, HttpRequestHandler('GET', 'http://yo'))
 
-    assert entrypoint_logger.adapters == {}
-
     calls = [
         entrypoint_logger.worker_setup,
         entrypoint_logger.worker_result,
@@ -270,18 +237,6 @@ def test_default_adapters(default_info, http_info, mock_container):
     for call_ in calls:
         call_(default_worker_ctx)
         call_(http_worker_ctx)
-
-        assert len(entrypoint_logger.adapters) == 2
-
-        assert DummyProvider in entrypoint_logger.adapters
-        assert isinstance(
-            entrypoint_logger.adapters[DummyProvider],
-            adapters.DefaultAdapter)
-
-        assert HttpRequestHandler in entrypoint_logger.adapters
-        assert isinstance(
-            entrypoint_logger.adapters[HttpRequestHandler],
-            adapters.HttpRequestHandlerAdapter)
 
     assert default_info.call_count == 4
     assert http_info.call_count == 4
@@ -311,8 +266,6 @@ def test_config_adapters(default_info, custom_info, mock_container):
     http_worker_ctx = WorkerContext(
         mock_container, None, HttpRequestHandler('GET', 'http://yo'))
 
-    assert entrypoint_logger.adapters == {}
-
     calls = [
         entrypoint_logger.worker_setup,
         entrypoint_logger.worker_result,
@@ -323,18 +276,6 @@ def test_config_adapters(default_info, custom_info, mock_container):
     for call_ in calls:
         call_(default_worker_ctx)
         call_(http_worker_ctx)
-
-        assert len(entrypoint_logger.adapters) == 2
-
-        assert DummyProvider in entrypoint_logger.adapters
-        assert isinstance(
-            entrypoint_logger.adapters[DummyProvider],
-            adapters.DefaultAdapter)
-
-        assert HttpRequestHandler in entrypoint_logger.adapters
-        assert isinstance(
-            entrypoint_logger.adapters[HttpRequestHandler],
-            CustomAdapter)
 
     assert default_info.call_count == 4
     assert custom_info.call_count == 4
