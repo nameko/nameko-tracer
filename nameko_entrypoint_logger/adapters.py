@@ -2,7 +2,7 @@ import inspect
 import logging
 from traceback import format_exception
 
-from nameko.exceptions import safe_for_serialization, serialize
+from nameko.exceptions import get_module_path
 from nameko.utils import get_redacted_args
 import six
 
@@ -40,7 +40,7 @@ class DefaultAdapter(logging.LoggerAdapter):
         data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
             worker_ctx.service_name, entrypoint.method_name)
 
-        data[constants.CONTENT_DATA_KEY] = safe_for_serialization(
+        data[constants.CONTENT_DATA_KEY] = utils.safe_for_serialisation(
             worker_ctx.data)
 
         data[constants.CALL_ID_KEY] = worker_ctx.call_id
@@ -97,34 +97,32 @@ class DefaultAdapter(logging.LoggerAdapter):
     def get_result(self, result):
         """ Return serialisable result data
         """
-        return safe_for_serialization(result)
+        return utils.safe_for_serialisation(result)
 
     def get_error(self, worker_ctx, exc_info):
         """ Transform exception to serialisable dictionary
         """
 
+        exc_type, exc, traceback = exc_info
+
         expected_exceptions = getattr(
             worker_ctx.entrypoint, 'expected_exceptions', None)
         expected_exceptions = expected_exceptions or tuple()
 
-        exc = exc_info[1]
         is_expected = isinstance(exc, expected_exceptions)
-
-        try:
-            exc_repr = serialize(exc)
-        except Exception:
-            exc_repr = 'exception serialization failed'
 
         try:
             exc_traceback = ''.join(format_exception(*exc_info))
         except Exception:
-            exc_traceback = 'traceback serialization failed'
+            exc_traceback = 'traceback serialisation failed'
 
         return {
-            'exc_type': exc_info[0].__name__,
-            'exc': utils.to_string(exc_repr),
+            'exc_type': exc_type.__name__,
+            'exc_path': get_module_path(exc_type),
+            'exc_args': utils.safe_for_serialisation(exc.args),
+            'exc_value': utils.safe_for_serialisation(exc),
             'traceback': exc_traceback,
-            'expected_exception': is_expected,
+            'is_expected': is_expected,
         }
 
 
@@ -147,7 +145,7 @@ class HttpRequestHandlerAdapter(DefaultAdapter):
         call_args['request'] = {
             'url': request.url,
             'method': request.method,
-            'data': utils.to_string(data),
+            'data': utils.safe_for_serialisation(data),
             'headers': dict(self.get_headers(request.environ)),
             'env': dict(self.get_environ(request.environ)),
         }

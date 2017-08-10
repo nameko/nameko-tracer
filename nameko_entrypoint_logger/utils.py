@@ -1,16 +1,44 @@
+import collections
 from importlib import import_module
 import json
+import logging
 
 import six
 
 
-def to_string(value):
-    if isinstance(value, six.string_types):
+logger = logging.getLogger(__name__)
+
+
+def serialise_to_json(value):
+    """ Safely serialise ``value`` to JSON formatted string
+    """
+    return json.dumps(safe_for_serialisation(value))
+
+
+def serialise_to_string(value):
+    """ Safely serialise ``value`` to string representation
+    """
+    return str(safe_for_serialisation(value))
+
+
+def safe_for_serialisation(value):
+    no_op_types = six.string_types + six.integer_types + (float,)
+    if isinstance(value, no_op_types):
         return value
-    if isinstance(value, (dict, list)):
-        return json.dumps(value)
     if isinstance(value, bytes):
-        return value.decode("utf-8")
+        return value.decode('utf-8', 'ignore')
+    if isinstance(value, dict):
+        return {
+            safe_for_serialisation(key): safe_for_serialisation(val)
+            for key, val in six.iteritems(value)}
+    if isinstance(value, collections.Iterable):
+        return list(map(safe_for_serialisation, value))
+    try:
+        return six.text_type(value)
+    except Exception:
+        logger.warning(
+            'failed to get string representation', exc_info=True)
+        return 'failed to get string representation'
 
 
 def import_by_path(dotted_path):

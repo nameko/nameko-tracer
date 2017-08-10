@@ -137,7 +137,7 @@ class TestDefaultAdapter:
         assert data['context_data']['some-key'] == 'simple-data'
         assert (
             data['context_data']['some-other-key'] ==
-            {'a bit more': ['complex data', '1', 'None']})
+            {'a bit more': ['complex data', 1, 'None']})
 
     @pytest.mark.parametrize(
         'stage',
@@ -248,15 +248,15 @@ class TestDefaultAdapter:
 
         assert 'return_args' not in data
 
-        exc = json.loads(data['error']['exc'])
-        assert exc['exc_path'] == 'test_adapters.Error'
-        assert exc['exc_args'] == ["Yo!"]
-        assert exc['exc_type'] == 'Error'
-        assert exc['value'] == 'Yo!'
-
         assert data['error']['exc_type'] == 'Error'
+        assert data['error']['exc_path'] == 'test_adapters.Error'
+        assert data['error']['exc_args'] == ["Yo!"]
+        assert data['error']['exc_type'] == 'Error'
+        assert data['error']['exc_value'] == 'Yo!'
+
         assert 'Error: Yo!' in data['error']['traceback']
-        assert data['error']['expected_exception'] is False
+
+        assert data['error']['is_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 
@@ -288,7 +288,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['expected_exception'] is False
+        assert data['error']['is_expected'] is False
 
     def test_error_data_expected_exception(
         self, adapter, tracker, worker_ctx
@@ -317,16 +317,14 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['expected_exception'] is True
+        assert data['error']['is_expected'] is True
 
-    @patch('nameko_entrypoint_logger.adapters.serialize')
     @patch('nameko_entrypoint_logger.adapters.format_exception')
-    def test_error_data_deals_with_failing_exception_serilisation(
-        self, format_exception, serialize, adapter, tracker, worker_ctx
+    def test_error_data_deals_with_failing_exception_serialisation(
+        self, format_exception, adapter, tracker, worker_ctx
     ):
 
         format_exception.side_effect = ValueError()
-        serialize.side_effect = ValueError()
 
         class Error(Exception):
             pass
@@ -351,10 +349,17 @@ class TestDefaultAdapter:
 
         assert 'return_args' not in data
 
-        assert data['error']['exc'] == 'exception serialization failed'
-        assert data['error']['traceback'] == 'traceback serialization failed'
         assert data['error']['exc_type'] == 'Error'
-        assert data['error']['expected_exception'] is False
+        assert data['error']['exc_path'] == 'test_adapters.Error'
+        assert data['error']['exc_args'] == ["Yo!"]
+        assert data['error']['exc_type'] == 'Error'
+        assert data['error']['exc_value'] == 'Yo!'
+
+        assert (
+            data['error']['traceback'] ==
+            'traceback serialisation failed')
+
+        assert data['error']['is_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 
@@ -512,7 +517,7 @@ class TestHttpRequestHandlerAdapter:
             (
                 'foo=bar',
                 'application/x-www-form-urlencoded',
-                '{"foo": "bar"}',
+                {'foo': 'bar'},
             ),
             (
                 'foo=bar',
