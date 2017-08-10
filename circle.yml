@@ -3,6 +3,9 @@ machine:
     version: 3.4.3
   services:
     - rabbitmq-server
+  pre:
+    - sudo rabbitmq-plugins enable rabbitmq_management
+    - sudo /etc/init.d/rabbitmq-server restart
 
 dependencies:
   override:
