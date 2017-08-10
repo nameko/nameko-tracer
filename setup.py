@@ -15,9 +15,10 @@ setup(
     ],
     extras_require={
         'dev': [
-            "coverage==4.1.0",
-            "pytest==2.9.2",
-            "isort==4.2.5",
+            "coverage==4.4.1",
+            "flake8==3.4.1",
+            "pylint==1.7.2",
+            "pytest==3.2.0",
         ]
     },
     dependency_links=[],
