@@ -168,30 +168,32 @@ Trace data
 
 TODO more words here ...
 
-The *request* stage trace includes the following details:
+The **request** stage trace includes the following details:
 
-  * Timestamp
-  * Entrypoint metadata including:
-     * service name
-     * entrypoint method name
-     * entrypoint type (e.g. `Rpc`),
-     * worker context data
-  * Tracking data consisting of call ID and call ID stack holding call IDs
-    of a chain of all consecutive calls leading to this one.
-  * Entrypoint call arguments. The tracer honours ``sensitive_variables``
-    of each entrypoint and redacts values of sensitive arguments before
-    placing them on the trace (there is also a flag saying whether the call
-    arguments were redacted).
+- A **timestamp**.
+- Entrypoint **metadata** consisting of:
 
-The *response* stage trace includes same details as the *request* stage trace
-plus the following additional response specific fields:
+  - service name
+  - entrypoint method name
+  - entrypoint type (e.g. ``Rpc``),
+  - worker context data
 
-  * Response status which is either ``success`` or ``error`` in case the
-    entrypoint execution failed.
-  * Result returned by the entrypoint (the package includes a logging filter
-    for truncating the response if needed).
-  * Exception details if the entrypoint execution failed.
-  * Response time saying how long it took to process the entrypoint.
+- Tracking data with **call ID** and **call ID stack** holding a chain of
+  call IDs of all consecutive calls leading to this one.
+- Entrypoint **call arguments**. The tracer honours ``sensitive_variables``
+  of each entrypoint and redacts values of sensitive arguments before
+  placing them on the trace (there is also a flag saying whether the call
+  arguments were redacted).
+
+The **response** stage trace includes same details as the *request* stage
+trace plus the following additional response specific fields:
+
+- Response **status** which is either ``success`` or ``error`` in case the
+  entrypoint execution failed.
+- **Result** returned by the entrypoint (the package includes a logging
+  filter for truncating the response if needed).
+- **Exception** details if the entrypoint execution failed.
+- **Response time** saying how long it took to process the entrypoint.
 
 Each trace also includes a stage key saying what stage the trace is for.
 
@@ -213,27 +215,27 @@ The package also includes two filters for truncating bulky parts of trace data.
 This is useful for reducing the amount of data ending up in your logs.
 Each stage has its own filter:
 
-  * ``nameko_tracer.filters.TruncateRequestFilter``
-  * ``nameko_tracer.filters.TruncateResponseFilter``
+* ``nameko_tracer.filters.TruncateRequestFilter``
+* ``nameko_tracer.filters.TruncateResponseFilter``
 
 The request truncating filter (``TruncateRequestFilter``) takes the following
 arguments:
 
-  * ``entrypoints`` - a list of regex strings identifying entrypoints whose
-    call arguments data should be truncated when logging. Defaults to an empty list.
-    Therefore you have to provide an input in order to make this filter taking
-    any effect.
-  * ``max_len`` - an integer representing the number of characters to keep.
-    Defaults to ``100``.
+* ``entrypoints`` - a list of regex strings identifying entrypoints whose
+  call arguments data should be truncated when logging. Defaults to an empty
+  list - you have to provide an input in order to make this filter to take
+  any effect.
+* ``max_len`` - an integer representing the number of characters to keep.
+  Defaults to ``100``.
 
 The response truncating filter (``TruncateRequestFilter``) takes the following
 arguments:
 
-  * ``entrypoints`` - a list of regex strings identifying entrypoints whose
-    response data should be truncated when logging. Defaults to
-    ``"^get_|^list_|^query_"``.
-  * ``max_len`` - an integer representing the number of characters to keep.
-    Defaults to ``100``.
+* ``entrypoints`` - a list of regex strings identifying entrypoints whose
+  response data should be truncated when logging. Defaults to
+  ``"^get_|^list_|^query_"``.
+* ``max_len`` - an integer representing the number of characters to keep.
+  Defaults to ``100``.
 
 Both filters add an additional flag to the trace saying whether the trimming
 was applied.
