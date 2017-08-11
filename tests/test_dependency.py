@@ -8,7 +8,7 @@ from nameko.testing.services import dummy, entrypoint_hook
 from nameko.testing.utils import DummyProvider
 import pytest
 
-from nameko_entrypoint_logger import adapters, constants, EntrypointLogger
+from nameko_entrypoint_logger import adapters, constants, Tracer
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
 
         name = "some-service"
 
-        entrypoint_logger = EntrypointLogger()
+        tracer = Tracer()
 
         @dummy
         def some_method(self, spam):
@@ -103,7 +103,7 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
 
         name = "some-service"
 
-        entrypoint_logger = EntrypointLogger()
+        tracer = Tracer()
 
         @dummy
         def some_method(self, spam):
@@ -155,7 +155,7 @@ def test_erroring_setup_adapter(logger, info, container_factory, tracker):
 
         name = "some-service"
 
-        entrypoint_logger = EntrypointLogger()
+        tracer = Tracer()
 
         @dummy
         def some_method(self, spam):
@@ -190,7 +190,7 @@ def test_erroring_result_adapter(logger, info, container_factory, tracker):
 
         name = "some-service"
 
-        entrypoint_logger = EntrypointLogger()
+        tracer = Tracer()
 
         @dummy
         def some_method(self, spam):
@@ -220,18 +220,18 @@ def test_default_adapters(default_info, http_info, mock_container):
 
     mock_container.service_name = 'dummy'
     mock_container.config = {}
-    entrypoint_logger = EntrypointLogger().bind(mock_container, 'logger')
-    entrypoint_logger.setup()
+    tracer = Tracer().bind(mock_container, 'logger')
+    tracer.setup()
 
     default_worker_ctx = WorkerContext(mock_container, None, DummyProvider())
     http_worker_ctx = WorkerContext(
         mock_container, None, HttpRequestHandler('GET', 'http://yo'))
 
     calls = [
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result,
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result
+        tracer.worker_setup,
+        tracer.worker_result,
+        tracer.worker_setup,
+        tracer.worker_result
     ]
 
     for call_ in calls:
@@ -259,18 +259,18 @@ def test_config_adapters(default_info, custom_info, mock_container):
             }
         }
     }
-    entrypoint_logger = EntrypointLogger().bind(mock_container, 'logger')
-    entrypoint_logger.setup()
+    tracer = Tracer().bind(mock_container, 'logger')
+    tracer.setup()
 
     default_worker_ctx = WorkerContext(mock_container, None, DummyProvider())
     http_worker_ctx = WorkerContext(
         mock_container, None, HttpRequestHandler('GET', 'http://yo'))
 
     calls = [
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result,
-        entrypoint_logger.worker_setup,
-        entrypoint_logger.worker_result
+        tracer.worker_setup,
+        tracer.worker_result,
+        tracer.worker_setup,
+        tracer.worker_result
     ]
 
     for call_ in calls:

@@ -37,7 +37,7 @@ def tracker():
 @pytest.fixture
 def logger(tracker):
 
-    logger = logging.getLogger('entrypoint_logger')
+    logger = logging.getLogger(constants.LOGGER_NAME)
     logger.setLevel(logging.INFO)
     logger.addHandler(tracker)
 
@@ -99,12 +99,12 @@ class TestDefaultAdapter:
         data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['service'] == 'some-service'
-        assert data['provider'] == 'Entrypoint'
-        assert data['provider_name'] == 'some_method'
-        assert data['entrypoint'] == 'some-service.some_method'
+        assert data['entrypoint_type'] == 'Entrypoint'
+        assert data['entrypoint'] == 'some_method'
+        assert data['entrypoint_path'] == 'some-service.some_method'
         assert data['call_id'] == worker_ctx.call_id
-        assert data['call_stack'] == worker_ctx.call_id_stack
-        assert data['lifecycle_stage'] == stage.value
+        assert data['call_id_stack'] == worker_ctx.call_id_stack
+        assert data['stage'] == stage.value
 
     @pytest.mark.parametrize(
         'stage',
@@ -220,7 +220,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['return_args'] == expected_result_out
+        assert data['response'] == expected_result_out
         assert data['status'] == constants.Status.success.value
 
     def test_error_data(self, adapter, tracker, worker_ctx):
@@ -246,7 +246,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert 'return_args' not in data
+        assert 'response' not in data
 
         assert data['error']['exc_type'] == 'Error'
         assert data['error']['exc_path'] == 'test_adapters.Error'
@@ -347,7 +347,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert 'return_args' not in data
+        assert 'response' not in data
 
         assert data['error']['exc_type'] == 'Error'
         assert data['error']['exc_path'] == 'test_adapters.Error'
@@ -420,10 +420,10 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['return_args'] == {'some': 'data'}
+        assert data['response'] == {'some': 'data'}
         assert data['status'] == constants.Status.success.value
-        assert data['provider'] == entrypoint.__class__.__name__
-        assert data['provider_name'] == entrypoint.method_name
+        assert data['entrypoint_type'] == entrypoint.__class__.__name__
+        assert data['entrypoint'] == entrypoint.method_name
 
 
 class TestHttpRequestHandlerAdapter:

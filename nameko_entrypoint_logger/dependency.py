@@ -12,7 +12,7 @@ from nameko_entrypoint_logger import adapters, constants, utils
 logger = logging.getLogger(__name__)
 
 
-class EntrypointLogger(DependencyProvider):
+class Tracer(DependencyProvider):
     """ Entrypoint logging dependency
 
     Logs call and result details about entrypoints fired.
