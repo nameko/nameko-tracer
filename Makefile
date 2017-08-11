@@ -1,11 +1,11 @@
 test: flake8 pylint pytest
 
 flake8:
-	flake8 nameko_entrypoint_logger tests
+	flake8 nameko_tracer tests
 
 pylint:
-	pylint nameko_entrypoint_logger -E
+	pylint nameko_tracer -E
 
 pytest:
-	coverage run --concurrency=eventlet --source nameko_entrypoint_logger --branch -m pytest tests
+	coverage run --concurrency=eventlet --source nameko_tracer --branch -m pytest tests
 	coverage report --show-missing --fail-under=100
