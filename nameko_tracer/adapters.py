@@ -6,7 +6,7 @@ from nameko.exceptions import get_module_path
 from nameko.utils import get_redacted_args
 import six
 
-from nameko_entrypoint_logger import constants, utils
+from nameko_tracer import constants, utils
 
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from nameko_entrypoint_logger import constants, filters
+from nameko_tracer import constants, filters
 
 
 @pytest.fixture

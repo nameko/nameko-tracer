@@ -139,7 +139,7 @@ CONTEXT_DATA_KEY = 'context_data'
 
 DEFAULT_ADAPTERS = {
     'nameko.web.handlers.HttpRequestHandler': (
-        'nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter'),
+        'nameko_tracer.adapters.HttpRequestHandlerAdapter'),
 }
 """
 Default adapter overrides setup

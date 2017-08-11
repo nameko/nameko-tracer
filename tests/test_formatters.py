@@ -3,7 +3,7 @@ from datetime import datetime
 from mock import Mock
 import pytest
 
-from nameko_entrypoint_logger import constants, formatters
+from nameko_tracer import constants, formatters
 
 
 def test_json_serializer_will_deal_with_datetime():

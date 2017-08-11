@@ -16,7 +16,7 @@ import pytest
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
-from nameko_entrypoint_logger import adapters, constants
+from nameko_tracer import adapters, constants
 
 
 @pytest.fixture
@@ -319,7 +319,7 @@ class TestDefaultAdapter:
 
         assert data['error']['is_expected'] is True
 
-    @patch('nameko_entrypoint_logger.adapters.format_exception')
+    @patch('nameko_tracer.adapters.format_exception')
     def test_error_data_deals_with_failing_exception_serialisation(
         self, format_exception, adapter, tracker, worker_ctx
     ):

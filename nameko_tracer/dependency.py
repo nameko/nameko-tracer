@@ -6,7 +6,7 @@ from weakref import WeakKeyDictionary
 
 from nameko.extensions import DependencyProvider
 
-from nameko_entrypoint_logger import adapters, constants, utils
+from nameko_tracer import adapters, constants, utils
 
 
 logger = logging.getLogger(__name__)

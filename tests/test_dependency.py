@@ -8,7 +8,7 @@ from nameko.testing.services import dummy, entrypoint_hook
 from nameko.testing.utils import DummyProvider
 import pytest
 
-from nameko_entrypoint_logger import adapters, constants, Tracer
+from nameko_tracer import adapters, constants, Tracer
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def tracker():
 
 @pytest.yield_fixture
 def mocked_datetime():
-    with patch('nameko_entrypoint_logger.dependency.datetime') as dt:
+    with patch('nameko_tracer.dependency.datetime') as dt:
         yield dt
 
 
@@ -144,8 +144,8 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
         constants.Status.error.value)
 
 
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
-@patch('nameko_entrypoint_logger.dependency.logger')
+@patch('nameko_tracer.adapters.DefaultAdapter.info')
+@patch('nameko_tracer.dependency.logger')
 def test_erroring_setup_adapter(logger, info, container_factory, tracker):
 
     class SomeError(Exception):
@@ -179,8 +179,8 @@ def test_erroring_setup_adapter(logger, info, container_factory, tracker):
         'Failed to log entrypoint trace', exc_info=True)
 
 
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
-@patch('nameko_entrypoint_logger.dependency.logger')
+@patch('nameko_tracer.adapters.DefaultAdapter.info')
+@patch('nameko_tracer.dependency.logger')
 def test_erroring_result_adapter(logger, info, container_factory, tracker):
 
     class SomeError(Exception):
@@ -214,8 +214,8 @@ def test_erroring_result_adapter(logger, info, container_factory, tracker):
         'Failed to log entrypoint trace', exc_info=True)
 
 
-@patch('nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter.info')
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
+@patch('nameko_tracer.adapters.HttpRequestHandlerAdapter.info')
+@patch('nameko_tracer.adapters.DefaultAdapter.info')
 def test_default_adapters(default_info, http_info, mock_container):
 
     mock_container.service_name = 'dummy'
@@ -246,7 +246,7 @@ class CustomAdapter(adapters.DefaultAdapter):
     pass
 
 
-@patch('nameko_entrypoint_logger.adapters.DefaultAdapter.info')
+@patch('nameko_tracer.adapters.DefaultAdapter.info')
 @patch.object(CustomAdapter, 'info')
 def test_config_adapters(default_info, custom_info, mock_container):
 
