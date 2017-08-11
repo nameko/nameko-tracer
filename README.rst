@@ -1,9 +1,8 @@
-=================
-Entrypoint Tracer
-=================
+========================
+nameko Entrypoint Tracer
+========================
 
-A `Nameko`_ extension for logging details about entrypoints fired.
-
+TODO introduction ...
 
 Usage
 =====
@@ -12,10 +11,11 @@ Install from PyPI:
 
 .. code:: console
 
-    pip install entrypoint-tracer
+    pip install nameko-tracer
 
 
-Add ``Tracer`` dependency provider to your service:
+Add ``nameko_tracer.EntrypointTracer`` dependency provider to your service
+plus add a simple RPC entrypoint so we have an endpoint to trace:
 
 
 .. code:: python
@@ -23,21 +23,21 @@ Add ``Tracer`` dependency provider to your service:
     # traced.py
 
     from nameko.rpc import rpc
-    from nameko_tracer import Tracer
+    from nameko_tracer import EntrypointTracer
 
 
     class Service:
 
         name = 'traced'
 
-        tracer = Tracer()
+        tracer = EntrypointTracer()
 
         @rpc
         def hello(self, name):
             return 'Hello, {}!'.format(name)
 
 
-Now, if you start your service in a shell
+Now, if you start your service in a shell:
 
 .. code:: console
 
@@ -51,7 +51,7 @@ And invoke the `test` entrypoint in another:
     In [1]: n.rpc.traced.hello(name='ナメコ')
     Out[2]: 'Hello, ナメコ!'
 
-You should see two log records printed in the first shell:
+You should see two log records printed out in the first shell:
 
 .. code:: console
 
@@ -61,9 +61,11 @@ You should see two log records printed in the first shell:
     entrypoint call trace
     entrypoint result trace
 
-That does not tell much, given the default logging formatter prints just the
-message. There's much more on the log records, let's configure service logging
-and customize the formatter:
+The output does not tell much, given the default logging formatter prints
+just the message. But there's much more on the log records, to get it out
+let's configure service logging and customize the formatter to include the
+trace details (the tracer adds safely serialisable details to ``nameko_trace``
+attribute of the log record):
 
 .. code:: yaml
 
@@ -84,7 +86,7 @@ and customize the formatter:
                 level: INFO
                 handlers: [tracer]
 
-Stop the service and start it again with pointing to the config file:
+Stop the service and start it again pointing to the new config file:
 
 .. code:: console
 
@@ -96,6 +98,8 @@ And invoke the ``test`` entrypoint again in the second shell:
 
     $ nameko shell
     In [1]: n.rpc.traced.hello(name='ナメコ')
+    Out[1]: 'Hello, ナメコ!'
+    In [2]: n.rpc.traced.hello(name='ナメコ')
     Out[2]: 'Hello, ナメコ!'
 
 In the first shell where the service runs you'll find the string
@@ -123,7 +127,8 @@ representation of the gathered trace information printed out:
 The traces include comprehensive information about the entrypoint fired and
 it would be more practical to have the details serialised in a format which
 is readable by both humans and machines. The tracer comes with a simple JSON
-formatter of the trace log record attribute ``nameko_tracer.formatters.JSONFormatter``:
+formatter of the trace log record attribute. Now reconfigure the logging to
+use ``nameko_tracer.formatters.JSONFormatter``:
 
 .. code:: yaml
 
@@ -144,7 +149,7 @@ formatter of the trace log record attribute ``nameko_tracer.formatters.JSONForma
                 level: INFO
                 handlers: [tracer]
 
-Now after restarting the service with the updated config and invoking the
+After restarting the service with the updated config and after invoking the
 testing call you will find the traces logged as JSON:
 
 .. code:: console
@@ -154,3 +159,123 @@ testing call you will find the traces logged as JSON:
     acted": false, "service": "traced", "entrypoint": "traced.hello", "provider": "
     Rpc", "lifecycle_stage": "request", "context_data": {}, "call_stack": ["standal
     ...
+
+Find more about what's included in the trace in the Trace Data section.
+
+
+Trace data
+==========
+
+TODO more words here ...
+
+The *request* stage trace includes the following details:
+
+  * Timestamp
+  * Entrypoint metadata including:
+     * service name
+     * entrypoint method name
+     * entrypoint type (e.g. `Rpc`),
+     * worker context data
+  * Tracking data consisting of call ID and call ID stack holding call IDs
+    of a chain of all consecutive calls leading to this one.
+  * Entrypoint call arguments. The tracer honours ``sensitive_variables``
+    of each entrypoint and redacts values of sensitive arguments before
+    placing them on the trace (there is also a flag saying whether the call
+    arguments were redacted).
+
+The *response* stage trace includes same details as the *request* stage trace
+plus the following additional response specific fields:
+
+  * Response status which is either ``success`` or ``error`` in case the
+    entrypoint execution failed.
+  * Result returned by the entrypoint (the package includes a logging filter
+    for truncating the response if needed).
+  * Exception details if the entrypoint execution failed.
+  * Response time saying how long it took to process the entrypoint.
+
+Each trace also includes a stage key saying what stage the trace is for.
+
+See ``constants`` module for the exact key names.
+
+
+JSON Trace Formatter
+====================
+
+The package includes ``nameko_tracer.formatters.JSONFormatter`` - a simple,
+but handy formatter which takes ``nameko_trace`` attribute of the log record
+and formats it as JSON string.
+
+
+Truncation Filters
+==================
+
+The package also includes two filters for truncating bulky parts of trace data.
+This is useful for reducing the amount of data ending up in your logs.
+Each stage has its own filter:
+
+  * ``nameko_tracer.filters.TruncateRequestFilter``
+  * ``nameko_tracer.filters.TruncateResponseFilter``
+
+The request truncating filter (``TruncateRequestFilter``) takes the following
+arguments:
+
+  * ``entrypoints`` - a list of regex strings identifying entrypoints whose
+    call arguments data should be truncated when logging. Defaults to an empty list.
+    Therefore you have to provide an input in order to make this filter taking
+    any effect.
+  * ``max_len`` - an integer representing the number of characters to keep.
+    Defaults to ``100``.
+
+The response truncating filter (``TruncateRequestFilter``) takes the following
+arguments:
+
+  * ``entrypoints`` - a list of regex strings identifying entrypoints whose
+    response data should be truncated when logging. Defaults to
+    ``"^get_|^list_|^query_"``.
+  * ``max_len`` - an integer representing the number of characters to keep.
+    Defaults to ``100``.
+
+Both filters add an additional flag to the trace saying whether the trimming
+was applied.
+
+Note that both filters first serialise the input to a JSON string before
+applying the truncation which will make the shortened output most probably
+in invalid JSON.
+
+An example of configuring logging to use the truncation filters:
+
+.. code:: yaml
+
+    # config.yaml
+
+    AMQP_URI: 'pyamqp://guest:guest@localhost'
+    LOGGING:
+        version: 1 
+        filters:
+            truncate_request_trace:
+                class: nameko_tracer.filters.TruncateRequestFilter
+                entrypoints:
+                    - insert_big_data
+                max_len: 200
+            truncate_response_trace:
+                class: nameko_tracer.filters.TruncateResponseFilter
+        formatters:
+            tracer:
+                class: nameko_tracer.formatters.JSONFormatter
+        handlers:
+            tracer:
+                class: logging.StreamHandler
+                formatter: tracer
+        loggers:
+            nameko_tracer:
+                level: INFO
+                handlers: [tracer]
+                filters:
+                    - truncate_request_trace
+                    - truncate_response_trace
+
+
+Custom Adapters
+===============
+
+TODO describe ...
