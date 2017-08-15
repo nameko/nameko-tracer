@@ -3,11 +3,11 @@ import logging
 
 from mock import ANY, call, patch
 
-from nameko_entrypoint_logger.handlers import PublisherHandler
+from nameko_tracer.handlers import PublisherHandler
 
 
-@patch('nameko_entrypoint_logger.handlers.connections')
-@patch('nameko_entrypoint_logger.handlers.producers')
+@patch('nameko_tracer.handlers.connections')
+@patch('nameko_tracer.handlers.producers')
 def test_handler_will_publish_log_message(producers, connections):
 
     amqp_uri = 'some:uri'
@@ -40,9 +40,9 @@ def test_handler_will_publish_log_message(producers, connections):
     assert config['content_type'] == content_type
 
 
-@patch('nameko_entrypoint_logger.handlers.logger')
-@patch('nameko_entrypoint_logger.handlers.connections')
-@patch('nameko_entrypoint_logger.handlers.producers')
+@patch('nameko_tracer.handlers.logger')
+@patch('nameko_tracer.handlers.connections')
+@patch('nameko_tracer.handlers.producers')
 def test_handler_will_fail_with_logging_the_error(
     producers, connections, module_logger
 ):

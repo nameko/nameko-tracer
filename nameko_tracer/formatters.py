@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 import logging
 
-from nameko_entrypoint_logger import constants
+from nameko_tracer import constants
 
 
 def default(obj):

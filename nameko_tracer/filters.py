@@ -3,7 +3,7 @@ import logging
 import re
 
 
-from nameko_entrypoint_logger import constants, utils
+from nameko_tracer import constants, utils
 
 
 class BaseTruncateFilter(logging.Filter, abc.ABC):

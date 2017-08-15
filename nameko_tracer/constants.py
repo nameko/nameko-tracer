@@ -15,7 +15,7 @@ class Status(Enum):
     error = 'error'
 
 
-LOGGER_NAME = 'entrypoint_logger'
+LOGGER_NAME = 'nameko_tracer'
 """ Name of the logger used for entrypoint logging
 
 Use this name to configure entrypoint logging in ``LOGGING`` setting
@@ -23,7 +23,7 @@ of Nameko config.
 
 """
 
-TRACE_KEY = 'entrypoint_trace'
+TRACE_KEY = 'nameko_trace'
 """ Name of the log record attribute holding the serialisable details
 
 Contains gathered entrypoint call and result details in serialisable
@@ -37,7 +37,7 @@ TIMESTAMP_KEY = 'timestamp'
 """
 
 
-STAGE_KEY = 'lifecycle_stage'
+STAGE_KEY = 'stage'
 """ A key holding the lifecycle stage (a value of one of ``Stage`` options)
 """
 
@@ -58,7 +58,7 @@ entrypoint call arguments were redacted.
 
 """
 
-RESPONSE_KEY = 'return_args'
+RESPONSE_KEY = 'response'
 """ A key holding serialisable return value of the entrypoint.
 """
 
@@ -69,14 +69,14 @@ truncated. Set by ``TruncateRequestFilter``.
 
 """
 
-RESPONSE_TRUNCATED_KEY = 'return_args_truncated'
+RESPONSE_TRUNCATED_KEY = 'response_truncated'
 """
 A key holding a boolean value saying whether the result data were truncated.
 Set by ``TruncateResponseFilter``.
 
 """
 
-REQUEST_LENGTH_KEY = 'call_args_bytes'
+REQUEST_LENGTH_KEY = 'call_args_length'
 """ A key holding the original call args data length
 
 Set by ``TruncateRequestFilter`` to the original length of data in
@@ -84,7 +84,7 @@ Set by ``TruncateRequestFilter`` to the original length of data in
 
 """
 
-RESPONSE_LENGTH_KEY = 'return_bytes'
+RESPONSE_LENGTH_KEY = 'response_length'
 """ A key holding the original result data length
 
 Set by ``TruncateResponseFilter`` to the original length of data in
@@ -110,15 +110,15 @@ SERVICE_NAME_KEY = 'service'
 """ A key holding the name of the service
 """
 
-ENTRYPOINT_NAME_KEY = 'provider_name'
+ENTRYPOINT_NAME_KEY = 'entrypoint'
 """ A key holding the entrypoint service method name e.g. ``'get_user'``
 """
 
-ENTRYPOINT_TYPE_KEY = 'provider'
+ENTRYPOINT_TYPE_KEY = 'entrypoint_type'
 """ A key holding the entrypoint type name e.g. ``'Rpc'``.
 """
 
-ENTRYPOINT_PATH_KEY = 'entrypoint'
+ENTRYPOINT_PATH_KEY = 'entrypoint_path'
 """
 A key holding the name of the service and the name of the entrypoint method
 e.g. ``'users.get_user'``.
@@ -129,17 +129,17 @@ CALL_ID_KEY = 'call_id'
 """ A key holding the unique ID of the entrypoint call
 """
 
-CALL_ID_STACK_KEY = 'call_stack'
+CALL_ID_STACK_KEY = 'call_id_stack'
 """ A key holding the call ID stack ...
 """
 
-CONTENT_DATA_KEY = 'context_data'
+CONTEXT_DATA_KEY = 'context_data'
 """ A key holding the worker context data dictionary
 """
 
 DEFAULT_ADAPTERS = {
     'nameko.web.handlers.HttpRequestHandler': (
-        'nameko_entrypoint_logger.adapters.HttpRequestHandlerAdapter'),
+        'nameko_tracer.adapters.HttpRequestHandlerAdapter'),
 }
 """
 Default adapter overrides setup
@@ -149,5 +149,5 @@ coming from config are merged in.
 
 """
 
-CONFIG_KEY = 'ENTRYPOINT_LOGGER'
+CONFIG_KEY = 'NAMEKO_TRACER'
 ADAPTERS_CONFIG_KEY = 'ADAPTERS'

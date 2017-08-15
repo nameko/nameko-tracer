@@ -19,8 +19,8 @@ class PublisherHandler(logging.Handler):
             amqp_uri, exchange_name, routing_key, serializer, content_type)
         super(PublisherHandler, self).__init__()
 
-    def emit(self, message):
-        self.publisher(message.getMessage())
+    def emit(self, log_record):
+        self.publisher(self.format(log_record))
 
 
 def publisher(amqp_uri, exchange_name, routing_key, serializer, content_type):

@@ -1,6 +1,6 @@
 import pytest
 
-from nameko_entrypoint_logger import utils
+from nameko_tracer import utils
 
 
 @pytest.mark.parametrize(

@@ -6,7 +6,7 @@ from nameko.exceptions import get_module_path
 from nameko.utils import get_redacted_args
 import six
 
-from nameko_entrypoint_logger import constants, utils
+from nameko_tracer import constants, utils
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class DefaultAdapter(logging.LoggerAdapter):
         data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
             worker_ctx.service_name, entrypoint.method_name)
 
-        data[constants.CONTENT_DATA_KEY] = utils.safe_for_serialisation(
+        data[constants.CONTEXT_DATA_KEY] = utils.safe_for_serialisation(
             worker_ctx.data)
 
         data[constants.CALL_ID_KEY] = worker_ctx.call_id
