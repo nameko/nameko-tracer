@@ -1,5 +1,5 @@
 ========================
-nameko Entrypoint Tracer
+Nameko Entrypoint Tracer
 ========================
 
 TODO introduction ...
