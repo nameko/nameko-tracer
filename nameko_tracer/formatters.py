@@ -1,4 +1,3 @@
-from datetime import datetime
 import json
 import logging
 
@@ -6,22 +5,11 @@ from nameko_tracer import constants
 
 
 def default(obj):
-    """ Default JSON serializer.
-
-    :param obj:
-        Might be a datetime
-
-    """
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    raise ValueError
-
-
-def dumps(obj):
-    return json.dumps(obj, default=default)
+    return str(obj)
 
 
 class JSONFormatter(logging.Formatter):
 
     def format(self, record):
-        return dumps(getattr(record, constants.TRACE_KEY))
+        return json.dumps(
+            getattr(record, constants.TRACE_KEY), default=default)
