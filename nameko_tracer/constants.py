@@ -149,5 +149,5 @@ coming from config are merged in.
 
 """
 
-CONFIG_KEY = 'NAMEKO_TRACER'
+CONFIG_KEY = 'TRACER'
 ADAPTERS_CONFIG_KEY = 'ADAPTERS'

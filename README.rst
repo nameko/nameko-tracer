@@ -1,5 +1,5 @@
 ========================
-nameko Entrypoint Tracer
+Nameko Entrypoint Tracer
 ========================
 
 TODO introduction ...
@@ -139,7 +139,7 @@ use ``nameko_tracer.formatters.JSONFormatter``:
         version: 1 
         formatters:
             tracer:
-                class: nameko_tracer.formatters.JSONFormatter
+                (): nameko_tracer.formatters.JSONFormatter
         handlers:
             tracer:
                 class: logging.StreamHandler
@@ -255,15 +255,15 @@ An example of configuring logging to use the truncation filters:
         version: 1 
         filters:
             truncate_request_trace:
-                class: nameko_tracer.filters.TruncateRequestFilter
+                (): nameko_tracer.filters.TruncateRequestFilter
                 entrypoints:
                     - insert_big_data
                 max_len: 200
             truncate_response_trace:
-                class: nameko_tracer.filters.TruncateResponseFilter
+                (): nameko_tracer.filters.TruncateResponseFilter
         formatters:
             tracer:
-                class: nameko_tracer.formatters.JSONFormatter
+                (): nameko_tracer.formatters.JSONFormatter
         handlers:
             tracer:
                 class: logging.StreamHandler
