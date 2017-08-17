@@ -14,7 +14,7 @@ Install from PyPI:
     pip install nameko-tracer
 
 
-Add ``nameko_tracer.EntrypointTracer`` dependency provider to your service
+Add ``nameko_tracer.Tracer`` dependency provider to your service
 plus add a simple RPC entrypoint so we have an endpoint to trace:
 
 
@@ -23,14 +23,14 @@ plus add a simple RPC entrypoint so we have an endpoint to trace:
     # traced.py
 
     from nameko.rpc import rpc
-    from nameko_tracer import EntrypointTracer
+    from nameko_tracer import Tracer
 
 
     class Service:
 
         name = 'traced'
 
-        tracer = EntrypointTracer()
+        tracer = Tracer()
 
         @rpc
         def hello(self, name):
