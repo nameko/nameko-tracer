@@ -79,6 +79,46 @@ def test_truncate_request(
 
 
 @pytest.mark.parametrize(
+    ('request_in', 'expected_request_out'),
+    (
+        (
+            ['too', 'short'],
+            ['too', 'short'],  # untouched
+        ),
+        (
+            'a long string should stay a string',
+            'a long string should sta',
+        ),
+        (
+            {'a': ('more', 'complex', 'data', 'structure')},
+            "{'a': ['more', 'complex'",  # turned to string
+        )
+    )
+)
+def test_truncate_request_to_string_casting(
+    handler, logger, request_in, expected_request_out
+):
+
+    filter_ = filters.TruncateRequestFilter(entrypoints=['spam'], max_len=24)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.TRACE_KEY: {
+            constants.STAGE_KEY: constants.Stage.request.value,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+            constants.REQUEST_KEY: request_in,
+        },
+    }
+
+    logger.info('request', extra=extra)
+
+    data = getattr(handler.log_record, constants.TRACE_KEY)
+
+    assert data[constants.REQUEST_KEY] == expected_request_out
+
+
+@pytest.mark.parametrize(
     (
         'entrypoints', 'max_len', 'expected_response',
         'expected_response_length', 'truncated'
@@ -123,6 +163,46 @@ def test_truncate_response(
     assert data[constants.RESPONSE_KEY] == expected_response
     assert data.get(constants.RESPONSE_TRUNCATED_KEY, False) == truncated
     assert data.get(constants.RESPONSE_LENGTH_KEY) == expected_response_length
+
+
+@pytest.mark.parametrize(
+    ('response_in', 'expected_response_out'),
+    (
+        (
+            ['too', 'short'],
+            ['too', 'short'],  # untouched
+        ),
+        (
+            'a long string should stay a string',
+            'a long string should sta',
+        ),
+        (
+            {'a': ('more', 'complex', 'data', 'structure')},
+            "{'a': ['more', 'complex'",  # turned to string
+        )
+    )
+)
+def test_truncate_response_to_string_casting(
+    handler, logger, response_in, expected_response_out
+):
+
+    filter_ = filters.TruncateResponseFilter(entrypoints=['spam'], max_len=24)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.TRACE_KEY: {
+            constants.STAGE_KEY: constants.Stage.response.value,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+            constants.RESPONSE_KEY: response_in,
+        },
+    }
+
+    logger.info('response', extra=extra)
+
+    data = getattr(handler.log_record, constants.TRACE_KEY)
+
+    assert data[constants.RESPONSE_KEY] == expected_response_out
 
 
 def test_truncate_request_ignores_response_data(handler, logger):

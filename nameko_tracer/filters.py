@@ -59,11 +59,10 @@ class TruncateRequestFilter(BaseTruncateFilter):
         call_args = utils.serialise_to_string(data[constants.REQUEST_KEY])
         length = len(call_args)
         if length > self.max_len:
-            call_args = call_args[:self.max_len]
+            data[constants.REQUEST_KEY] = call_args[:self.max_len]
             truncated = True
         else:
             truncated = False
-        data[constants.REQUEST_KEY] = call_args
         data[constants.REQUEST_TRUNCATED_KEY] = truncated
         data[constants.REQUEST_LENGTH_KEY] = length
         return data
@@ -91,11 +90,10 @@ class TruncateResponseFilter(BaseTruncateFilter):
         result = utils.serialise_to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:
-            result = result[:self.max_len]
+            data[constants.RESPONSE_KEY] = result[:self.max_len]
             truncated = True
         else:
             truncated = False
-        data[constants.RESPONSE_KEY] = result
         data[constants.RESPONSE_TRUNCATED_KEY] = truncated
         data[constants.RESPONSE_LENGTH_KEY] = length
         return data
