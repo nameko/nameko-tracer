@@ -29,9 +29,10 @@ def test_json_serialiser_will_deal_with_datetime(input_, expected_output):
 def test_elasticsearch_document_serialiser():
 
     trace = {
+        constants.CONTEXT_DATA_KEY: {'should': ('be', 'serialised')},
         constants.REQUEST_KEY: ('should', 'be', 'serialised'),
-        constants.RESPONSE_KEY: {'also': ('should', 'be', 'serialised')},
-        constants.CONTEXT_DATA_KEY: {'should': ['NOT', 'be', 'serialised']},
+        constants.RESPONSE_KEY: {'should': ('be', 'serialised')},
+        'some-other-key': {'should': ['NOT', 'be', 'serialised']},
     }
 
     log_record = Mock()
@@ -42,11 +43,14 @@ def test_elasticsearch_document_serialiser():
     document = json.loads(document)
 
     assert (
+        document[constants.CONTEXT_DATA_KEY] ==
+        '{"should": ["be", "serialised"]}')
+    assert (
         document[constants.REQUEST_KEY] ==
         '["should", "be", "serialised"]')
     assert (
         document[constants.RESPONSE_KEY] ==
-        '{"also": ["should", "be", "serialised"]}')
+        '{"should": ["be", "serialised"]}')
     assert (
-        document[constants.CONTEXT_DATA_KEY] ==
+        document['some-other-key'] ==
         {'should': ['NOT', 'be', 'serialised']})
