@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='nameko-tracer',
-    version='1.0.1',
+    version='1.0.2',
     description='Nameko extension logging entrypoint processing metrics',
     author='student.com',
     author_email='wearehiring@student.com',
