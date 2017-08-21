@@ -240,9 +240,9 @@ arguments:
 Both filters add an additional flag to the trace saying whether the trimming
 was applied.
 
-Note that both filters first serialise the input to a JSON string before
-applying the truncation which will make the shortened output most probably
-in invalid JSON.
+Note that the filters first serialise the input to a string before applying
+the truncation. If the length of string representation of the input is within
+the ``max_len`` limit, the input is kept untouched.
 
 An example of configuring logging to use the truncation filters:
 
