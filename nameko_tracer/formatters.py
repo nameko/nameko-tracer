@@ -20,7 +20,7 @@ class JSONFormatter(logging.Formatter):
         return serialise(getattr(record, constants.TRACE_KEY))
 
 
-class ElasticisearchDocumentFormatter(JSONFormatter):
+class ElasticsearchDocumentFormatter(JSONFormatter):
     """ Format trace as JSON which can be fed to Elasticsearch as a document
 
     Request and response data fields of the document are serialized as JSON

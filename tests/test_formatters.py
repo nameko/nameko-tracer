@@ -38,7 +38,7 @@ def test_elasticsearch_document_serialiser():
     log_record = Mock()
     setattr(log_record, constants.TRACE_KEY, trace)
 
-    document = formatters.ElasticisearchDocumentFormatter().format(log_record)
+    document = formatters.ElasticsearchDocumentFormatter().format(log_record)
 
     document = json.loads(document)
 
