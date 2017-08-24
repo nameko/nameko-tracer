@@ -28,7 +28,7 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
 
     """
 
-    extra_serilise_keys = (
+    extra_serialise_keys = (
         constants.CONTEXT_DATA_KEY,
         constants.REQUEST_KEY,
         constants.RESPONSE_KEY)
@@ -37,7 +37,7 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
 
         trace = getattr(record, constants.TRACE_KEY)
 
-        for key in self.extra_serilise_keys:
+        for key in self.extra_serialise_keys:
             if key in trace:
                 trace[key] = serialise(trace[key])
 
