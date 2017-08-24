@@ -28,12 +28,21 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
 
     """
 
+    extra_serilise_keys = (
+        constants.CONTEXT_DATA_KEY,
+        constants.REQUEST_KEY,
+        constants.RESPONSE_KEY)
+
     def format(self, record):
+
         trace = getattr(record, constants.TRACE_KEY)
-        trace[constants.CONTEXT_DATA_KEY] = serialise(
-            trace[constants.CONTEXT_DATA_KEY])
-        trace[constants.REQUEST_KEY] = serialise(
-            trace[constants.REQUEST_KEY])
-        trace[constants.RESPONSE_KEY] = serialise(
-            trace[constants.RESPONSE_KEY])
+
+        for key in self.extra_serilise_keys:
+            if key in trace:
+                trace[key] = serialise(trace[key])
+
+        if constants.ERROR_KEY in trace:
+            trace[constants.ERROR_KEY]['exc_args'] = serialise(
+                trace[constants.ERROR_KEY]['exc_args'])
+
         return serialise(trace)

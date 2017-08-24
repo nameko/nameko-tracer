@@ -26,14 +26,45 @@ def test_json_serialiser_will_deal_with_datetime(input_, expected_output):
         formatters.JSONFormatter().format(log_record) == expected_output)
 
 
-def test_elasticsearch_document_serialiser():
+@pytest.mark.parametrize(
+    ('key', 'value_in', 'expected_value_out'),
+    (
+        (
+            constants.CONTEXT_DATA_KEY,
+            {'should': ('be', 'serialised')},
+            '{"should": ["be", "serialised"]}',
+        ),
+        (
+            constants.REQUEST_KEY,
+            ('should', 'be', 'serialised'),
+            '["should", "be", "serialised"]',
+        ),
+        (
+            constants.RESPONSE_KEY,
+            {'should': ('be', 'serialised')},
+            '{"should": ["be", "serialised"]}',
+        ),
+        (
+            constants.ERROR_KEY,
+            {
+                'exc_args': {'should': ('be', 'serialised')},
+                'spam': {'should': ['NOT', 'be', 'serialised']},
+            },
+            {
+                'exc_args': '{"should": ["be", "serialised"]}',
+                'spam': {'should': ['NOT', 'be', 'serialised']},
+            }
+        ),
+        (
+            'some-other-key',
+            {'should': ['NOT', 'be', 'serialised']},
+            {'should': ['NOT', 'be', 'serialised']},
+        ),
+    )
+)
+def test_elasticsearch_document_serialiser(key, value_in, expected_value_out):
 
-    trace = {
-        constants.CONTEXT_DATA_KEY: {'should': ('be', 'serialised')},
-        constants.REQUEST_KEY: ('should', 'be', 'serialised'),
-        constants.RESPONSE_KEY: {'should': ('be', 'serialised')},
-        'some-other-key': {'should': ['NOT', 'be', 'serialised']},
-    }
+    trace = {key: value_in}
 
     log_record = Mock()
     setattr(log_record, constants.TRACE_KEY, trace)
@@ -42,15 +73,4 @@ def test_elasticsearch_document_serialiser():
 
     document = json.loads(document)
 
-    assert (
-        document[constants.CONTEXT_DATA_KEY] ==
-        '{"should": ["be", "serialised"]}')
-    assert (
-        document[constants.REQUEST_KEY] ==
-        '["should", "be", "serialised"]')
-    assert (
-        document[constants.RESPONSE_KEY] ==
-        '{"should": ["be", "serialised"]}')
-    assert (
-        document['some-other-key'] ==
-        {'should': ['NOT', 'be', 'serialised']})
+    assert document[key] == expected_value_out
