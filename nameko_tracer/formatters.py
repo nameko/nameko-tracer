@@ -41,8 +41,8 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
             if key in trace:
                 trace[key] = serialise(trace[key])
 
-        if constants.ERROR_KEY in trace:
-            trace[constants.ERROR_KEY]['exc_args'] = serialise(
-                trace[constants.ERROR_KEY]['exc_args'])
+        if constants.EXCEPTION_KEY in trace:
+            trace[constants.EXCEPTION_KEY]['exc_args'] = serialise(
+                trace[constants.EXCEPTION_KEY]['exc_args'])
 
         return serialise(trace)

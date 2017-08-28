@@ -222,7 +222,7 @@ class TestDefaultAdapter:
         assert data['response'] == expected_result_out
         assert data['status'] == constants.Status.success.value
 
-    def test_error_data(self, adapter, tracker, worker_ctx):
+    def test_exception_data(self, adapter, tracker, worker_ctx):
 
         class Error(Exception):
             pass
@@ -247,20 +247,20 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_path'] == 'test_adapters.Error'
-        assert data['error']['exc_args'] == ["Yo!"]
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_value'] == 'Yo!'
+        assert data['exception']['exc_type'] == 'Error'
+        assert data['exception']['exc_path'] == 'test_adapters.Error'
+        assert data['exception']['exc_args'] == ["Yo!"]
+        assert data['exception']['exc_type'] == 'Error'
+        assert data['exception']['exc_value'] == 'Yo!'
 
-        assert 'Error: Yo!' in data['error']['traceback']
+        assert 'Error: Yo!' in data['exception']['traceback']
 
-        assert data['error']['is_expected'] is False
+        assert data['exception']['is_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 
     @pytest.mark.parametrize('expected_exceptions', (None, (), (ValueError)))
-    def test_error_data_unexpected_exception(
+    def test_exception_data_unexpected_exception(
         self, adapter, tracker, worker_ctx, expected_exceptions
     ):
 
@@ -287,9 +287,9 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['is_expected'] is False
+        assert data['exception']['is_expected'] is False
 
-    def test_error_data_expected_exception(
+    def test_exception_data_expected_exception(
         self, adapter, tracker, worker_ctx
     ):
 
@@ -316,10 +316,10 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['is_expected'] is True
+        assert data['exception']['is_expected'] is True
 
     @patch('nameko_tracer.adapters.format_exception')
-    def test_error_data_deals_with_failing_exception_serialisation(
+    def test_exception_data_deals_with_failing_exception_serialisation(
         self, format_exception, adapter, tracker, worker_ctx
     ):
 
@@ -348,17 +348,17 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_path'] == 'test_adapters.Error'
-        assert data['error']['exc_args'] == ["Yo!"]
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_value'] == 'Yo!'
+        assert data['exception']['exc_type'] == 'Error'
+        assert data['exception']['exc_path'] == 'test_adapters.Error'
+        assert data['exception']['exc_args'] == ["Yo!"]
+        assert data['exception']['exc_type'] == 'Error'
+        assert data['exception']['exc_value'] == 'Yo!'
 
         assert (
-            data['error']['traceback'] ==
+            data['exception']['traceback'] ==
             'traceback serialisation failed')
 
-        assert data['error']['is_expected'] is False
+        assert data['exception']['is_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 

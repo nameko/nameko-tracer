@@ -102,7 +102,7 @@ RESPONSE_TIME_KEY = 'response_time'
 """
 
 
-ERROR_KEY = 'error'
+EXCEPTION_KEY = 'exception'
 """ A key holding exception details if the entrypoint resulted into an error
 """
 
