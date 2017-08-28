@@ -101,7 +101,6 @@ class TestDefaultAdapter:
         assert data['service'] == 'some-service'
         assert data['entrypoint_type'] == 'Entrypoint'
         assert data['entrypoint'] == 'some_method'
-        assert data['entrypoint_path'] == 'some-service.some_method'
         assert data['call_id'] == worker_ctx.call_id
         assert data['call_id_stack'] == worker_ctx.call_id_stack
         assert data['stage'] == stage.value

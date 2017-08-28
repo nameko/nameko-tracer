@@ -118,13 +118,6 @@ ENTRYPOINT_TYPE_KEY = 'entrypoint_type'
 """ A key holding the entrypoint type name e.g. ``'Rpc'``.
 """
 
-ENTRYPOINT_PATH_KEY = 'entrypoint_path'
-"""
-A key holding the name of the service and the name of the entrypoint method
-e.g. ``'users.get_user'``.
-
-"""
-
 CALL_ID_KEY = 'call_id'
 """ A key holding the unique ID of the entrypoint call
 """

@@ -37,8 +37,6 @@ class DefaultAdapter(logging.LoggerAdapter):
         data[constants.SERVICE_NAME_KEY] = worker_ctx.service_name
         data[constants.ENTRYPOINT_TYPE_KEY] = type(entrypoint).__name__
         data[constants.ENTRYPOINT_NAME_KEY] = entrypoint.method_name
-        data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
-            worker_ctx.service_name, entrypoint.method_name)
 
         data[constants.CONTEXT_DATA_KEY] = utils.safe_for_serialisation(
             worker_ctx.data)
