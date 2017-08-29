@@ -142,7 +142,7 @@ SERVICE_NAME_KEY = 'service'
 """ A key holding the name of the service
 """
 
-ENTRYPOINT_NAME_KEY = 'entrypoint'
+ENTRYPOINT_NAME_KEY = 'entrypoint_name'
 """ A key holding the entrypoint service method name e.g. ``'get_user'``
 """
 

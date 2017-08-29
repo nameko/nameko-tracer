@@ -100,7 +100,7 @@ class TestDefaultAdapter:
 
         assert data['service'] == 'some-service'
         assert data['entrypoint_type'] == 'Entrypoint'
-        assert data['entrypoint'] == 'some_method'
+        assert data['entrypoint_name'] == 'some_method'
         assert data['call_id'] == worker_ctx.call_id
         assert data['call_id_stack'] == worker_ctx.call_id_stack
         assert data['stage'] == stage.value
@@ -421,7 +421,7 @@ class TestDefaultAdapter:
         assert data['response'] == {'some': 'data'}
         assert data['response_status'] == constants.Status.success.value
         assert data['entrypoint_type'] == entrypoint.__class__.__name__
-        assert data['entrypoint'] == entrypoint.method_name
+        assert data['entrypoint_name'] == entrypoint.method_name
 
 
 class TestHttpRequestHandlerAdapter:
