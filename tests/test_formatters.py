@@ -45,15 +45,9 @@ def test_json_serialiser_will_deal_with_datetime(input_, expected_output):
             '{"should": ["be", "serialised"]}',
         ),
         (
-            constants.EXCEPTION_KEY,
-            {
-                'exc_args': {'should': ('be', 'serialised')},
-                'spam': {'should': ['NOT', 'be', 'serialised']},
-            },
-            {
-                'exc_args': '{"should": ["be", "serialised"]}',
-                'spam': {'should': ['NOT', 'be', 'serialised']},
-            }
+            constants.EXCEPTION_ARGS_KEY,
+            {'should': ('be', 'serialised')},
+            '{"should": ["be", "serialised"]}',
         ),
         (
             'some-other-key',

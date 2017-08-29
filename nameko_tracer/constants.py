@@ -102,8 +102,40 @@ RESPONSE_TIME_KEY = 'response_time'
 """
 
 
-EXCEPTION_KEY = 'exception'
-""" A key holding exception details if the entrypoint resulted into an error
+EXCEPTION_TYPE_KEY = 'exception_type'
+""" A key holding exception type name
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_PATH_KEY = 'exception_path'
+""" A key holding exception path e.g. ``some.module.SomeError``
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_VALUE_KEY = 'exception_value'
+""" A key holding string representation of exception raised
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_ARGS_KEY = 'exception_args'
+""" A key holding a list of exception arguments
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_TRACEBACK_KEY = 'exception_traceback'
+""" A key holding exception traceback string
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_EXPECTED_KEY = 'exception_expected'
+""" A key holding a boolean saying whether the exception raised was one of
+errors expected by the entrypoint
+
 """
 
 SERVICE_NAME_KEY = 'service'

@@ -247,15 +247,14 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['exception']['exc_type'] == 'Error'
-        assert data['exception']['exc_path'] == 'test_adapters.Error'
-        assert data['exception']['exc_args'] == ["Yo!"]
-        assert data['exception']['exc_type'] == 'Error'
-        assert data['exception']['exc_value'] == 'Yo!'
+        assert data['exception_type'] == 'Error'
+        assert data['exception_path'] == 'test_adapters.Error'
+        assert data['exception_args'] == ["Yo!"]
+        assert data['exception_value'] == 'Yo!'
 
-        assert 'Error: Yo!' in data['exception']['traceback']
+        assert 'Error: Yo!' in data['exception_traceback']
 
-        assert data['exception']['is_expected'] is False
+        assert data['exception_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 
@@ -287,7 +286,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['exception']['is_expected'] is False
+        assert data['exception_expected'] is False
 
     def test_exception_data_expected_exception(
         self, adapter, tracker, worker_ctx
@@ -316,7 +315,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['exception']['is_expected'] is True
+        assert data['exception_expected'] is True
 
     @patch('nameko_tracer.adapters.format_exception')
     def test_exception_data_deals_with_failing_exception_serialisation(
@@ -348,17 +347,17 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['exception']['exc_type'] == 'Error'
-        assert data['exception']['exc_path'] == 'test_adapters.Error'
-        assert data['exception']['exc_args'] == ["Yo!"]
-        assert data['exception']['exc_type'] == 'Error'
-        assert data['exception']['exc_value'] == 'Yo!'
+        assert data['exception_type'] == 'Error'
+        assert data['exception_path'] == 'test_adapters.Error'
+        assert data['exception_args'] == ["Yo!"]
+        assert data['exception_type'] == 'Error'
+        assert data['exception_value'] == 'Yo!'
 
         assert (
-            data['exception']['traceback'] ==
+            data['exception_traceback'] ==
             'traceback serialisation failed')
 
-        assert data['exception']['is_expected'] is False
+        assert data['exception_expected'] is False
 
         assert data['status'] == constants.Status.error.value
 
