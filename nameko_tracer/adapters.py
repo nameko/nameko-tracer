@@ -112,9 +112,11 @@ class DefaultAdapter(logging.LoggerAdapter):
         except Exception:
             exc_traceback = 'traceback serialisation failed'
 
+        exc_args = utils.safe_for_serialisation(exc.args)
+
         data[constants.EXCEPTION_TYPE_KEY] = exc_type.__name__
         data[constants.EXCEPTION_PATH_KEY] = get_module_path(exc_type)
-        data[constants.EXCEPTION_ARGS_KEY] = utils.safe_for_serialisation(exc.args)
+        data[constants.EXCEPTION_ARGS_KEY] = exc_args
         data[constants.EXCEPTION_VALUE_KEY] = utils.safe_for_serialisation(exc)
         data[constants.EXCEPTION_TRACEBACK_KEY] = exc_traceback
         data[constants.EXCEPTION_EXPECTED_KEY] = is_expected
