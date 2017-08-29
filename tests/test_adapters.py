@@ -220,7 +220,7 @@ class TestDefaultAdapter:
         data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['response'] == expected_result_out
-        assert data['status'] == constants.Status.success.value
+        assert data['response_status'] == constants.Status.success.value
 
     def test_exception_data(self, adapter, tracker, worker_ctx):
 
@@ -256,7 +256,7 @@ class TestDefaultAdapter:
 
         assert data['exception_expected'] is False
 
-        assert data['status'] == constants.Status.error.value
+        assert data['response_status'] == constants.Status.error.value
 
     @pytest.mark.parametrize('expected_exceptions', (None, (), (ValueError)))
     def test_exception_data_unexpected_exception(
@@ -359,7 +359,7 @@ class TestDefaultAdapter:
 
         assert data['exception_expected'] is False
 
-        assert data['status'] == constants.Status.error.value
+        assert data['response_status'] == constants.Status.error.value
 
     @pytest.fixture(params=[Rpc, EventHandler, Consumer])
     def entrypoint(self, request, container_factory, rabbit_config):
@@ -419,7 +419,7 @@ class TestDefaultAdapter:
         data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['response'] == {'some': 'data'}
-        assert data['status'] == constants.Status.success.value
+        assert data['response_status'] == constants.Status.success.value
         assert data['entrypoint_type'] == entrypoint.__class__.__name__
         assert data['entrypoint'] == entrypoint.method_name
 

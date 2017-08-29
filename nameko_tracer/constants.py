@@ -92,7 +92,7 @@ Set by ``TruncateResponseFilter`` to the original length of data in
 
 """
 
-RESPONSE_STATUS_KEY = 'status'
+RESPONSE_STATUS_KEY = 'response_status'
 """ A key holding the result status (a value of one of ``Status`` options)
 """
 
