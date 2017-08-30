@@ -92,7 +92,7 @@ Set by ``TruncateResponseFilter`` to the original length of data in
 
 """
 
-RESPONSE_STATUS_KEY = 'status'
+RESPONSE_STATUS_KEY = 'response_status'
 """ A key holding the result status (a value of one of ``Status`` options)
 """
 
@@ -102,27 +102,52 @@ RESPONSE_TIME_KEY = 'response_time'
 """
 
 
-ERROR_KEY = 'error'
-""" A key holding exception details if the entrypoint resulted into an error
+EXCEPTION_TYPE_KEY = 'exception_type'
+""" A key holding exception type name
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_PATH_KEY = 'exception_path'
+""" A key holding exception path e.g. ``some.module.SomeError``
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_VALUE_KEY = 'exception_value'
+""" A key holding string representation of exception raised
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_ARGS_KEY = 'exception_args'
+""" A key holding a list of exception arguments
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_TRACEBACK_KEY = 'exception_traceback'
+""" A key holding exception traceback string
+
+Set if the entrypoint resulted into an error
+"""
+
+EXCEPTION_EXPECTED_KEY = 'exception_expected'
+""" A key holding a boolean saying whether the exception raised was one of
+errors expected by the entrypoint
+
 """
 
 SERVICE_NAME_KEY = 'service'
 """ A key holding the name of the service
 """
 
-ENTRYPOINT_NAME_KEY = 'entrypoint'
+ENTRYPOINT_NAME_KEY = 'entrypoint_name'
 """ A key holding the entrypoint service method name e.g. ``'get_user'``
 """
 
 ENTRYPOINT_TYPE_KEY = 'entrypoint_type'
 """ A key holding the entrypoint type name e.g. ``'Rpc'``.
-"""
-
-ENTRYPOINT_PATH_KEY = 'entrypoint_path'
-"""
-A key holding the name of the service and the name of the entrypoint method
-e.g. ``'users.get_user'``.
-
 """
 
 CALL_ID_KEY = 'call_id'

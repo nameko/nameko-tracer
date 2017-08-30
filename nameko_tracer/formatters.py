@@ -31,7 +31,8 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
     extra_serialise_keys = (
         constants.CONTEXT_DATA_KEY,
         constants.REQUEST_KEY,
-        constants.RESPONSE_KEY)
+        constants.RESPONSE_KEY,
+        constants.EXCEPTION_ARGS_KEY)
 
     def format(self, record):
 
@@ -40,9 +41,5 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
         for key in self.extra_serialise_keys:
             if key in trace:
                 trace[key] = serialise(trace[key])
-
-        if constants.ERROR_KEY in trace:
-            trace[constants.ERROR_KEY]['exc_args'] = serialise(
-                trace[constants.ERROR_KEY]['exc_args'])
 
         return serialise(trace)

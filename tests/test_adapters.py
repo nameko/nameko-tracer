@@ -100,8 +100,7 @@ class TestDefaultAdapter:
 
         assert data['service'] == 'some-service'
         assert data['entrypoint_type'] == 'Entrypoint'
-        assert data['entrypoint'] == 'some_method'
-        assert data['entrypoint_path'] == 'some-service.some_method'
+        assert data['entrypoint_name'] == 'some_method'
         assert data['call_id'] == worker_ctx.call_id
         assert data['call_id_stack'] == worker_ctx.call_id_stack
         assert data['stage'] == stage.value
@@ -221,9 +220,9 @@ class TestDefaultAdapter:
         data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['response'] == expected_result_out
-        assert data['status'] == constants.Status.success.value
+        assert data['response_status'] == constants.Status.success.value
 
-    def test_error_data(self, adapter, tracker, worker_ctx):
+    def test_exception_data(self, adapter, tracker, worker_ctx):
 
         class Error(Exception):
             pass
@@ -248,20 +247,19 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_path'] == 'test_adapters.Error'
-        assert data['error']['exc_args'] == ["Yo!"]
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_value'] == 'Yo!'
+        assert data['exception_type'] == 'Error'
+        assert data['exception_path'] == 'test_adapters.Error'
+        assert data['exception_args'] == ["Yo!"]
+        assert data['exception_value'] == 'Yo!'
 
-        assert 'Error: Yo!' in data['error']['traceback']
+        assert 'Error: Yo!' in data['exception_traceback']
 
-        assert data['error']['is_expected'] is False
+        assert data['exception_expected'] is False
 
-        assert data['status'] == constants.Status.error.value
+        assert data['response_status'] == constants.Status.error.value
 
     @pytest.mark.parametrize('expected_exceptions', (None, (), (ValueError)))
-    def test_error_data_unexpected_exception(
+    def test_exception_data_unexpected_exception(
         self, adapter, tracker, worker_ctx, expected_exceptions
     ):
 
@@ -288,9 +286,9 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['is_expected'] is False
+        assert data['exception_expected'] is False
 
-    def test_error_data_expected_exception(
+    def test_exception_data_expected_exception(
         self, adapter, tracker, worker_ctx
     ):
 
@@ -317,10 +315,10 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['error']['is_expected'] is True
+        assert data['exception_expected'] is True
 
     @patch('nameko_tracer.adapters.format_exception')
-    def test_error_data_deals_with_failing_exception_serialisation(
+    def test_exception_data_deals_with_failing_exception_serialisation(
         self, format_exception, adapter, tracker, worker_ctx
     ):
 
@@ -349,19 +347,19 @@ class TestDefaultAdapter:
 
         assert 'response' not in data
 
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_path'] == 'test_adapters.Error'
-        assert data['error']['exc_args'] == ["Yo!"]
-        assert data['error']['exc_type'] == 'Error'
-        assert data['error']['exc_value'] == 'Yo!'
+        assert data['exception_type'] == 'Error'
+        assert data['exception_path'] == 'test_adapters.Error'
+        assert data['exception_args'] == ["Yo!"]
+        assert data['exception_type'] == 'Error'
+        assert data['exception_value'] == 'Yo!'
 
         assert (
-            data['error']['traceback'] ==
+            data['exception_traceback'] ==
             'traceback serialisation failed')
 
-        assert data['error']['is_expected'] is False
+        assert data['exception_expected'] is False
 
-        assert data['status'] == constants.Status.error.value
+        assert data['response_status'] == constants.Status.error.value
 
     @pytest.fixture(params=[Rpc, EventHandler, Consumer])
     def entrypoint(self, request, container_factory, rabbit_config):
@@ -421,9 +419,9 @@ class TestDefaultAdapter:
         data = getattr(log_record, constants.TRACE_KEY)
 
         assert data['response'] == {'some': 'data'}
-        assert data['status'] == constants.Status.success.value
+        assert data['response_status'] == constants.Status.success.value
         assert data['entrypoint_type'] == entrypoint.__class__.__name__
-        assert data['entrypoint'] == entrypoint.method_name
+        assert data['entrypoint_name'] == entrypoint.method_name
 
 
 class TestHttpRequestHandlerAdapter:

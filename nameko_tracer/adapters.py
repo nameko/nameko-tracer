@@ -37,8 +37,6 @@ class DefaultAdapter(logging.LoggerAdapter):
         data[constants.SERVICE_NAME_KEY] = worker_ctx.service_name
         data[constants.ENTRYPOINT_TYPE_KEY] = type(entrypoint).__name__
         data[constants.ENTRYPOINT_NAME_KEY] = entrypoint.method_name
-        data[constants.ENTRYPOINT_PATH_KEY] = '{}.{}'.format(
-            worker_ctx.service_name, entrypoint.method_name)
 
         data[constants.CONTEXT_DATA_KEY] = utils.safe_for_serialisation(
             worker_ctx.data)
@@ -59,8 +57,7 @@ class DefaultAdapter(logging.LoggerAdapter):
             if exc_info:
                 data[constants.RESPONSE_STATUS_KEY] = (
                     constants.Status.error.value)
-                data[constants.ERROR_KEY] = self.get_error(
-                    worker_ctx, exc_info)
+                self.set_exception(data, worker_ctx, exc_info)
             else:
                 data[constants.RESPONSE_STATUS_KEY] = (
                     constants.Status.success.value)
@@ -99,16 +96,15 @@ class DefaultAdapter(logging.LoggerAdapter):
         """
         return utils.safe_for_serialisation(result)
 
-    def get_error(self, worker_ctx, exc_info):
-        """ Transform exception to serialisable dictionary
+    def set_exception(self, data, worker_ctx, exc_info):
+        """ Set exception details as serialisable trace attributes
         """
 
-        exc_type, exc, traceback = exc_info
+        exc_type, exc, _ = exc_info
 
         expected_exceptions = getattr(
             worker_ctx.entrypoint, 'expected_exceptions', None)
         expected_exceptions = expected_exceptions or tuple()
-
         is_expected = isinstance(exc, expected_exceptions)
 
         try:
@@ -116,14 +112,14 @@ class DefaultAdapter(logging.LoggerAdapter):
         except Exception:
             exc_traceback = 'traceback serialisation failed'
 
-        return {
-            'exc_type': exc_type.__name__,
-            'exc_path': get_module_path(exc_type),
-            'exc_args': utils.safe_for_serialisation(exc.args),
-            'exc_value': utils.safe_for_serialisation(exc),
-            'traceback': exc_traceback,
-            'is_expected': is_expected,
-        }
+        exc_args = utils.safe_for_serialisation(exc.args)
+
+        data[constants.EXCEPTION_TYPE_KEY] = exc_type.__name__
+        data[constants.EXCEPTION_PATH_KEY] = get_module_path(exc_type)
+        data[constants.EXCEPTION_ARGS_KEY] = exc_args
+        data[constants.EXCEPTION_VALUE_KEY] = utils.safe_for_serialisation(exc)
+        data[constants.EXCEPTION_TRACEBACK_KEY] = exc_traceback
+        data[constants.EXCEPTION_EXPECTED_KEY] = is_expected
 
 
 class HttpRequestHandlerAdapter(DefaultAdapter):
