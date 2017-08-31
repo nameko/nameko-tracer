@@ -38,6 +38,13 @@ def mocked_datetime():
         yield dt
 
 
+@pytest.yield_fixture(autouse=True)
+def mocked_hostname():
+    with patch('nameko_tracer.dependency.socket.gethostname') as gethostname:
+        gethostname.return_value = 'some.host'
+        yield gethostname
+
+
 def test_successful_result(container_factory, mocked_datetime, tracker):
 
     request_timestamp = datetime(2017, 7, 7, 12, 0, 0)
@@ -76,6 +83,7 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
     assert (
         setup_details[constants.STAGE_KEY] ==
         constants.Stage.request.value)
+    assert setup_details[constants.HOSTNAME_KEY] == 'some.host'
 
     result_details = getattr(result_record, constants.TRACE_KEY)
 
@@ -84,6 +92,7 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
     assert (
         result_details[constants.STAGE_KEY] ==
         constants.Stage.response.value)
+    assert result_details[constants.HOSTNAME_KEY] == 'some.host'
     assert (
         result_details[constants.RESPONSE_STATUS_KEY] ==
         constants.Status.success.value)

@@ -72,7 +72,8 @@ class TestDefaultAdapter:
 
     @pytest.fixture
     def adapter(self, logger):
-        adapter = adapters.DefaultAdapter(logger, extra={})
+        adapter = adapters.DefaultAdapter(
+            logger, extra={'hostname': 'some.host'})
         return adapter
 
     @pytest.mark.parametrize(
@@ -98,6 +99,7 @@ class TestDefaultAdapter:
 
         data = getattr(log_record, constants.TRACE_KEY)
 
+        assert data['hostname'] == 'some.host'
         assert data['service'] == 'some-service'
         assert data['entrypoint_type'] == 'Entrypoint'
         assert data['entrypoint_name'] == 'some_method'
@@ -462,7 +464,8 @@ class TestHttpRequestHandlerAdapter:
 
     @pytest.fixture
     def adapter(self, logger):
-        adapter = adapters.HttpRequestHandlerAdapter(logger, extra={})
+        adapter = adapters.HttpRequestHandlerAdapter(
+            logger, extra={'hostname': 'some.host'})
         return adapter
 
     @pytest.mark.parametrize(

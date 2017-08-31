@@ -41,7 +41,7 @@ class Tracer(DependencyProvider):
 
     def adapter_factory(self, worker_ctx):
         adapter_class = self.adapter_types[type(worker_ctx.entrypoint)]
-        extra = {constants.HOSTNAME_KEY: socket.gethostname()}
+        extra = {'hostname': socket.gethostname()}
         return adapter_class(self.logger, extra=extra)
 
     def worker_setup(self, worker_ctx):
