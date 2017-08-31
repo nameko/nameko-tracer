@@ -156,9 +156,9 @@ class HttpRequestHandlerAdapter(DefaultAdapter):
         """
         return {
             'content_type': result.content_type,
-            'result': result.get_data(),
+            'data': result.get_data(),
             'status_code': result.status_code,
-            'result_bytes': result.content_length,
+            'content_length': result.content_length,
         }
 
     def get_headers(self, environ):

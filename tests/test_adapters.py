@@ -581,6 +581,6 @@ class TestHttpRequestHandlerAdapter:
 
         result = adapter.get_result(response)
 
-        assert result['result'] == data.encode('utf-8')
+        assert result['data'] == data.encode('utf-8')
         assert result['status_code'] == status_code
         assert result['content_type'].startswith(content_type)
