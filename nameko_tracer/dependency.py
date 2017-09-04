@@ -58,7 +58,10 @@ class Tracer(DependencyProvider):
                 'timestamp': timestamp,
             }
             adapter = self.adapter_factory(worker_ctx)
-            adapter.info('entrypoint call trace', extra=extra)
+            adapter.info(
+                '[%s] entrypoint call trace',
+                worker_ctx.call_id,
+                extra=extra)
         except Exception:
             logger.warning('Failed to log entrypoint trace', exc_info=True)
 
@@ -81,8 +84,14 @@ class Tracer(DependencyProvider):
             }
             adapter = self.adapter_factory(worker_ctx)
             if exc_info:
-                adapter.warning('entrypoint result trace', extra=extra)
+                adapter.warning(
+                    '[%s] entrypoint result trace',
+                    worker_ctx.call_id,
+                    extra=extra)
             else:
-                adapter.info('entrypoint result trace', extra=extra)
+                adapter.info(
+                    '[%s] entrypoint result trace',
+                    worker_ctx.call_id,
+                    extra=extra)
         except Exception:
             logger.warning('Failed to log entrypoint trace', exc_info=True)

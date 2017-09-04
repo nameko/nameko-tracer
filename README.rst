@@ -58,8 +58,8 @@ You should see two log records printed out in the first shell:
     $ nameko run traced
     starting services: traced
     Connected to amqp://guest:***@127.0.0.1:5672//
-    entrypoint call trace
-    entrypoint result trace
+    [traced.hello.8eb11de2-0b28-495d-af91-98bd6a051bca] entrypoint call trace
+    [traced.hello.8eb11de2-0b28-495d-af91-98bd6a051bca] entrypoint result trace
 
 The output does not tell much, given the default logging formatter prints
 just the message. But there's much more on the log records, to get it out

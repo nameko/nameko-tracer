@@ -72,12 +72,14 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
 
     setup_record, result_record = tracker.log_records
 
-    assert setup_record.msg == 'entrypoint call trace'
+    assert setup_record.msg == '[%s] entrypoint call trace'
     assert setup_record.levelno == logging.INFO
-    assert result_record.msg == 'entrypoint result trace'
+    assert result_record.msg == '[%s] entrypoint result trace'
     assert result_record.levelno == logging.INFO
 
     setup_details = getattr(setup_record, constants.TRACE_KEY)
+
+    assert setup_record.args == (setup_details['call_id'],)
 
     assert setup_details[constants.TIMESTAMP_KEY] == request_timestamp
     assert (
@@ -86,6 +88,8 @@ def test_successful_result(container_factory, mocked_datetime, tracker):
     assert setup_details[constants.HOSTNAME_KEY] == 'some.host'
 
     result_details = getattr(result_record, constants.TRACE_KEY)
+
+    assert result_record.args == (result_details['call_id'],)
 
     assert result_details[constants.TIMESTAMP_KEY] == response_timestamp
     assert result_details[constants.RESPONSE_TIME_KEY] == 60.0
@@ -129,12 +133,14 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
 
     setup_record, result_record = tracker.log_records
 
-    assert setup_record.msg == 'entrypoint call trace'
+    assert setup_record.msg == '[%s] entrypoint call trace'
     assert setup_record.levelno == logging.INFO
-    assert result_record.msg == 'entrypoint result trace'
+    assert result_record.msg == '[%s] entrypoint result trace'
     assert result_record.levelno == logging.WARNING
 
     setup_details = getattr(setup_record, constants.TRACE_KEY)
+
+    assert setup_record.args == (setup_details['call_id'],)
 
     assert setup_details[constants.TIMESTAMP_KEY] == request_timestamp
     assert (
@@ -142,6 +148,8 @@ def test_failing_result(container_factory, mocked_datetime, tracker):
         constants.Stage.request.value)
 
     result_details = getattr(result_record, constants.TRACE_KEY)
+
+    assert result_record.args == (result_details['call_id'],)
 
     assert result_details[constants.TIMESTAMP_KEY] == response_timestamp
     assert result_details[constants.RESPONSE_TIME_KEY] == 60.0
