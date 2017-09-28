@@ -87,6 +87,10 @@ class TruncateResponseFilter(BaseTruncateFilter):
     lifecycle_stage = constants.Stage.response
 
     def truncate(self, data):
+
+        if constants.RESPONSE_KEY not in data:
+            return data
+
         result = utils.serialise_to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:

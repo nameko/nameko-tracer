@@ -205,6 +205,30 @@ def test_truncate_response_to_string_casting(
     assert data[constants.RESPONSE_KEY] == expected_response_out
 
 
+def test_truncate_response_ignores_error_response(handler, logger):
+
+    filter_ = filters.TruncateResponseFilter(entrypoints=['^spam'], max_len=5)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.TRACE_KEY: {
+            constants.STAGE_KEY: constants.Stage.response.value,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+            constants.RESPONSE_STATUS_KEY: constants.Status.error.value,
+        },
+    }
+
+    logger.info('response', extra=extra)
+
+    data = getattr(handler.log_record, constants.TRACE_KEY)
+
+    assert constants.RESPONSE_TRUNCATED_KEY not in data
+    assert constants.RESPONSE_LENGTH_KEY not in data
+    assert constants.REQUEST_TRUNCATED_KEY not in data
+    assert constants.REQUEST_LENGTH_KEY not in data
+
+
 def test_truncate_request_ignores_response_data(handler, logger):
 
     filter_ = filters.TruncateRequestFilter(entrypoints=['^spam'], max_len=5)
