@@ -88,7 +88,7 @@ class TruncateResponseFilter(BaseTruncateFilter):
 
     def truncate(self, data):
 
-        if not constants.RESPONSE_KEY in data:
+        if constants.RESPONSE_KEY not in data:
             return data
 
         result = utils.serialise_to_string(data[constants.RESPONSE_KEY])
