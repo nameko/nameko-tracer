@@ -5,6 +5,7 @@ from traceback import format_exception
 from nameko.exceptions import get_module_path
 from nameko.utils import get_redacted_args
 import six
+from werkzeug.wrappers import Response
 
 from nameko_tracer import constants, utils
 
@@ -81,6 +82,10 @@ class DefaultAdapter(logging.LoggerAdapter):
         entrypoint = worker_ctx.entrypoint
 
         if getattr(entrypoint, 'sensitive_variables', None):
+            # backwards compatibility with nameko < 2.7.0
+            entrypoint.sensitive_arguments = entrypoint.sensitive_variables
+
+        if getattr(entrypoint, 'sensitive_arguments', None):
             call_args = get_redacted_args(
                 entrypoint, *worker_ctx.args, **worker_ctx.kwargs)
             redacted = True
@@ -154,6 +159,21 @@ class HttpRequestHandlerAdapter(DefaultAdapter):
     def get_result(self, result):
         """ Transform response object to serialisable dictionary
         """
+        if not isinstance(result, Response):
+            if isinstance(result, tuple):
+                if len(result) == 3:
+                    status, _, payload = result
+                else:
+                    status, payload = result
+            else:
+                payload = result
+                status = 200
+
+            result = Response(
+                payload,
+                status=status,
+            )
+
         return {
             'content_type': result.content_type,
             'data': result.get_data(),

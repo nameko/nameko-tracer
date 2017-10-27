@@ -166,15 +166,18 @@ class TestDefaultAdapter:
         assert data['call_args'] == {'spam': 'some-arg'}
         assert data['call_args_redacted'] is False
 
+    @pytest.fixture(params=['sensitive_variables', 'sensitive_arguments'])
+    def compatibility_shim(self, request):
+        return request.param
+
     @pytest.mark.parametrize(
         'stage',
         (constants.Stage.request, constants.Stage.response),
     )
     def test_sensitive_call_args_data(
-        self, adapter, tracker, worker_ctx, stage
+        self, adapter, tracker, worker_ctx, stage, compatibility_shim
     ):
-
-        worker_ctx.entrypoint.sensitive_variables = ('spam')
+        setattr(worker_ctx.entrypoint, compatibility_shim, ('spam'))
 
         extra = {
             'stage': stage,
@@ -553,34 +556,45 @@ class TestHttpRequestHandlerAdapter:
         assert call_args['request']['headers']['content_type'] == content_type
 
     @pytest.mark.parametrize(
-        ('data', 'status_code', 'content_type'),
+        ('response', 'data', 'status_code', 'content_type'),
         (
-            (
+            (Response(
                 '{"value": 1}',
-                200,
-                'application/json',
+                status=200,
+                mimetype='application/json',
+            ), '{"value": 1}', 200, 'application/json',
+            ),
+            (Response(
+                'foo',
+                status=202,
+                mimetype='text/plain',
+            ), 'foo', 202, 'text/plain',
+            ),
+            (Response(
+                'some error',
+                status=400,
+                mimetype='text/plain',
+            ), 'some error', 400, 'text/plain',
+            ),
+            (
+                (200, {}, 'foo'),
+                'foo', 200, 'text/plain',
+            ),
+            (
+                (200, 'foo'),
+                'foo', 200, 'text/plain',
             ),
             (
                 'foo',
-                202,
-                'text/plain',
-            ),
-            (
-                'some error',
-                400,
-                'text/plain',
-            ),
+                'foo', 200, 'text/plain',
+            )
         )
     )
     def test_result_data(
-        self, adapter, data, status_code, content_type
+        self, adapter, response, data, status_code, content_type
     ):
 
-        response = Response(
-            data, status=status_code, mimetype=content_type)
-
         result = adapter.get_result(response)
-
         assert result['data'] == data.encode('utf-8')
         assert result['status_code'] == status_code
         assert result['content_type'].startswith(content_type)
