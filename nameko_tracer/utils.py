@@ -22,8 +22,8 @@ def serialise_to_string(value):
 
 
 def safe_for_serialisation(value):
-    no_op_types = six.string_types + six.integer_types + (float,)
-    if isinstance(value, no_op_types) or value is None:
+    no_op_types = six.string_types + six.integer_types + (float, type(None))
+    if isinstance(value, no_op_types):
         return value
     if isinstance(value, bytes):
         return value.decode('utf-8', 'ignore')
