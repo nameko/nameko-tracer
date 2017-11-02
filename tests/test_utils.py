@@ -13,7 +13,7 @@ from nameko_tracer import utils
         ({'string': 'string'}, {'string': 'string'}),
         ({1}, [1]),
         (object, repr(object)),
-        (None, 'None'),
+        (None, None),
         (
             ((1, 0.5, 'string', object), [], {}, set()),
             [[1, 0.5, 'string', repr(object)], [], {}, []],
