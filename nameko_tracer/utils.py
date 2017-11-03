@@ -22,7 +22,7 @@ def serialise_to_string(value):
 
 
 def safe_for_serialisation(value):
-    no_op_types = six.string_types + six.integer_types + (float,)
+    no_op_types = six.string_types + six.integer_types + (float, type(None))
     if isinstance(value, no_op_types):
         return value
     if isinstance(value, bytes):

@@ -138,7 +138,7 @@ class TestDefaultAdapter:
         assert data['context_data']['some-key'] == 'simple-data'
         assert (
             data['context_data']['some-other-key'] ==
-            {'a bit more': ['complex data', 1, 'None']})
+            {'a bit more': ['complex data', 1, None]})
 
     @pytest.mark.parametrize(
         'stage',
@@ -200,7 +200,7 @@ class TestDefaultAdapter:
     @pytest.mark.parametrize(
         ('result_in', 'expected_result_out'),
         (
-            (None, 'None'),
+            (None, None),
             ('spam', 'spam'),
             ({'spam': 'ham'}, {'spam': 'ham'}),
         ),
