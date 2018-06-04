@@ -2,6 +2,14 @@ Release Notes
 =============
 
 
+Version 1.1.0
+-------------
+
+Released 2018-06-04
+
+* Truncation filters are not restricted by lifecycle-stage
+
+
 Version 1.0.8
 -------------
 

@@ -136,7 +136,7 @@ use ``nameko_tracer.formatters.JSONFormatter``:
 
     AMQP_URI: 'pyamqp://guest:guest@localhost'
     LOGGING:
-        version: 1 
+        version: 1
         formatters:
             tracer:
                 (): nameko_tracer.formatters.JSONFormatter
@@ -213,12 +213,11 @@ Truncation Filters
 
 The package also includes two filters for truncating bulky parts of trace data.
 This is useful for reducing the amount of data ending up in your logs.
-Each stage has its own filter:
 
-* ``nameko_tracer.filters.TruncateRequestFilter``
+* ``nameko_tracer.filters.TruncateCallArgsFilter``
 * ``nameko_tracer.filters.TruncateResponseFilter``
 
-The request truncating filter (``TruncateRequestFilter``) takes the following
+The truncating filter (``TruncateCallArgsFilter``) takes the following
 arguments:
 
 * ``entrypoints`` - a list of regex strings identifying entrypoints whose
@@ -228,7 +227,7 @@ arguments:
 * ``max_len`` - an integer representing the number of characters to keep.
   Defaults to ``100``.
 
-The response truncating filter (``TruncateRequestFilter``) takes the following
+The response truncating filter (``TruncateResponseFilter``) takes the following
 arguments:
 
 * ``entrypoints`` - a list of regex strings identifying entrypoints whose
@@ -252,10 +251,10 @@ An example of configuring logging to use the truncation filters:
 
     AMQP_URI: 'pyamqp://guest:guest@localhost'
     LOGGING:
-        version: 1 
+        version: 1
         filters:
             truncate_request_trace:
-                (): nameko_tracer.filters.TruncateRequestFilter
+                (): nameko_tracer.filters.TruncateCallArgsFilter
                 entrypoints:
                     - insert_big_data
                 max_len: 200
