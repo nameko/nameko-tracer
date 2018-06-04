@@ -1,0 +1,30 @@
+language: python
+
+python:
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - nightly
+
+matrix:
+  allow_failures:
+    - python: nightly
+
+install:
+  - pip install -U pip setuptools
+  - pip install -U -e ".[dev]"
+
+script:
+  - make test
+
+deploy:
+
+  - provider: pypi
+    on:
+      tags: true
+      repo: Overseas-Student-Living/nameko-tracer
+      condition: $TRAVIS_PYTHON_VERSION = "3.5"
+    distributions: sdist bdist_wheel
+    user: iky
+    password:
+      secure: sSITgjEntic6Q9B2UZb9z9N4E8f82N+ntctEsB60BSQGARNy4ciDg1DP+Muyx7LBrV+1Q8TIYXAlPUXgvwr74afWhPba7cCTonQziEMAJ8rsz/zR8PnP8iAs+LimG1z4WEr3DqppaKZsAgng7ZXu9QBDbmRJIWEi6zqcMeKZk1QXu9FC6Db2AWTaeTUaWomnhxqgPI5v0bRe/5Idz6DQavOpUikI8pUOgDCXwdvnzwr1q91rRkf2fNmbJod6sedBL+uDFwvkhjwPIEZAwcv5v7AsCOpAb0wSmfq1VQow5T/bMT9bBbIrnlMxNb5h9lYoDH76GpLA1EIv5dnSYOAYjl5k78D+4yqxqeMX6rbrM6C3lUMfNrN8BYF4SJDYP/FW4E51uu3PBr79L4gvLd/u4OLv/D+KvkvC2ZtakHzPMWND4QpjVXoVHIFqTUFUqSpntdRpcZn0qK2FupVx+u/7MEgm4kalSMEDqNTzdyIFOX1LSbgYzTpexY6TbqrbFagJmOPGyvn+0ewT9aK17TSDinE6AYD1rRa3cZFTLxWcmCeqeYkO+Y3p4BcTwNLX+TssvAzveGNL3eGAMaiD70lpsLHT2CzkZHQJ9tsxM8bW/zTz4P+Aq8cqJk//AvI09GA+1aSdudT0zr7g9u9oMEqUXK7gX6V+trIRgRLzp9KGpzg=
