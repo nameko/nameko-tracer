@@ -31,7 +31,7 @@ class BaseTruncateFilter(logging.Filter, abc.ABC):
         """
 
 
-class TruncateRequestFilter(BaseTruncateFilter):
+class TruncateCallArgsFilter(BaseTruncateFilter):
     """ Truncate serialized call arguments
 
     If the truncation is applied, the call data is serialised to string
@@ -94,3 +94,6 @@ class TruncateResponseFilter(BaseTruncateFilter):
         data[constants.RESPONSE_TRUNCATED_KEY] = truncated
         data[constants.RESPONSE_LENGTH_KEY] = length
         return data
+
+
+TruncateRequestFilter = TruncateCallArgsFilter
