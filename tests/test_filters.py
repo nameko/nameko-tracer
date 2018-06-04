@@ -23,6 +23,7 @@ def handler():
 @pytest.yield_fixture
 def logger(handler):
     logger = logging.getLogger('test')
+    logger.setLevel(logging.INFO)
     logger.addHandler(handler)
     yield logger
     for handler in logger.handlers:
@@ -34,36 +35,37 @@ def logger(handler):
 @pytest.mark.parametrize(
     (
         'entrypoints', 'max_len', 'expected_request',
-        'expected_request_length', 'truncated',
+        'expected_request_length', 'truncated', 'stage'
     ),
     (
         # should truncate call args of 'spam' entrypoint
-        (['spam'], 5, '12345', 9, True),
-        (['^ham|spam'], 5, '12345', 9, True),
-        (['^spam'], 5, '12345', 9, True),
+        (['spam'], 5, '12345', 9, True, constants.Stage.request),
+        (['^ham|spam'], 5, '12345', 9, True, constants.Stage.request),
+        (['^spam'], 5, '12345', 9, True, constants.Stage.request),
+        (['^spam'], 5, '12345', 9, True, constants.Stage.response),
         # call args of 'spam' entrypoint shorter than max len
-        (['^spam'], 10, '123456789', 9, False),
+        (['^spam'], 10, '123456789', 9, False, constants.Stage.request),
         # 'spam' entrypoint does not match the regexp
-        (['^ham'], 5, '123456789', None, False),
+        (['^ham'], 5, '123456789', None, False, constants.Stage.request),
         # no entrypoint should be truncated
-        (None, 5, '123456789', None, False),
-        ([], 5, '123456789', None, False),
-        ('', 5, '123456789', None, False),
+        (None, 5, '123456789', None, False, constants.Stage.request),
+        ([], 5, '123456789', None, False, constants.Stage.request),
+        ('', 5, '123456789', None, False, constants.Stage.request),
     )
 )
-def test_truncate_request(
+def test_truncate_call_args(
     handler, logger, entrypoints, max_len, expected_request,
-    expected_request_length, truncated
+    expected_request_length, truncated, stage
 ):
 
-    filter_ = filters.TruncateRequestFilter(
+    filter_ = filters.TruncateCallArgsFilter(
         entrypoints=entrypoints, max_len=max_len)
 
     logger.addFilter(filter_)
 
     extra = {
         constants.TRACE_KEY: {
-            constants.STAGE_KEY: constants.Stage.request.value,
+            constants.STAGE_KEY: stage.value,
             constants.ENTRYPOINT_NAME_KEY: 'spam',
             constants.REQUEST_KEY: '123456789',
         },
@@ -76,6 +78,28 @@ def test_truncate_request(
     assert data[constants.REQUEST_KEY] == expected_request
     assert data.get(constants.REQUEST_TRUNCATED_KEY, False) == truncated
     assert data.get(constants.REQUEST_LENGTH_KEY) == expected_request_length
+
+
+def test_truncate_no_call_args(handler, logger):
+
+    filter_ = filters.TruncateCallArgsFilter(entrypoints=['spam'], max_len=5)
+
+    logger.addFilter(filter_)
+
+    extra = {
+        constants.TRACE_KEY: {
+            constants.STAGE_KEY: constants.Stage.request,
+            constants.ENTRYPOINT_NAME_KEY: 'spam',
+        },
+    }
+
+    logger.info('request', extra=extra)
+
+    data = getattr(handler.log_record, constants.TRACE_KEY)
+    assert data[constants.ENTRYPOINT_NAME_KEY] == 'spam'
+    assert constants.REQUEST_KEY not in data
+    assert constants.REQUEST_TRUNCATED_KEY not in data
+    assert constants.REQUEST_LENGTH_KEY not in data
 
 
 @pytest.mark.parametrize(
@@ -95,11 +119,11 @@ def test_truncate_request(
         )
     )
 )
-def test_truncate_request_to_string_casting(
+def test_truncate_call_args_to_string_casting(
     handler, logger, request_in, expected_request_out
 ):
 
-    filter_ = filters.TruncateRequestFilter(entrypoints=['spam'], max_len=24)
+    filter_ = filters.TruncateCallArgsFilter(entrypoints=['spam'], max_len=24)
 
     logger.addFilter(filter_)
 
@@ -231,7 +255,7 @@ def test_truncate_response_ignores_error_response(handler, logger):
 
 def test_truncate_request_ignores_response_data(handler, logger):
 
-    filter_ = filters.TruncateRequestFilter(entrypoints=['^spam'], max_len=5)
+    filter_ = filters.TruncateCallArgsFilter(entrypoints=['^spam'], max_len=5)
 
     logger.addFilter(filter_)
 
