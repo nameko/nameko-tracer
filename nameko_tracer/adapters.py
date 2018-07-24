@@ -47,6 +47,7 @@ class DefaultAdapter(logging.LoggerAdapter):
 
         data[constants.CALL_ID_KEY] = worker_ctx.call_id
         data[constants.CALL_ID_STACK_KEY] = worker_ctx.call_id_stack
+        data[constants.ORIGIN_CALL_ID_KEY] = worker_ctx.origin_call_id
 
         data[constants.STAGE_KEY] = stage.value
 
