@@ -2,6 +2,14 @@ Release Notes
 =============
 
 
+Version 1.2.0
+-------------
+
+Released 2018-07-24
+
+* Add origin call ID to log message
+
+
 Version 1.1.0
 -------------
 
