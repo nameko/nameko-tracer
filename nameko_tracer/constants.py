@@ -166,6 +166,9 @@ CALL_ID_STACK_KEY = 'call_id_stack'
 """ A key holding the call ID stack ...
 """
 
+ORIGIN_CALL_ID_KEY = 'origin_call_id'
+""" A key holding the Source of all stack calls
+"""
 
 CONTEXT_DATA_KEY = 'context_data'
 """ A key holding the worker context data dictionary
