@@ -24,7 +24,7 @@ deploy:
   - provider: pypi
     on:
       tags: true
-      repo: Overseas-Student-Living/nameko-tracer
+      repo: nameko/nameko-tracer
       condition: $TRAVIS_PYTHON_VERSION = "3.5"
     distributions: sdist bdist_wheel
     user: iky
