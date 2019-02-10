@@ -7,7 +7,7 @@ setup(
     description='Nameko extension logging entrypoint processing metrics',
     author='student.com',
     author_email='wearehiring@student.com',
-    url='https://github.com/Overseas-Student-Living/nameko-tracer',
+    url='https://github.com/nameko/nameko-tracer',
     packages=find_packages(exclude=['test', 'test.*']),
     install_requires=[
         "nameko>=2.2.0",
@@ -16,7 +16,7 @@ setup(
         'dev': [
             "coverage==4.4.1",
             "flake8==3.4.1",
-            "pylint==1.7.2",
+            "pylint==2.2.2",
             "pytest==3.2.0",
         ]
     },

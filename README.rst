@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/nameko/nameko-tracer.svg?branch=master
+    :target: https://travis-ci.org/nameko/nameko-tracer
+
 ========================
 Nameko Entrypoint Tracer
 ========================
