@@ -16,7 +16,7 @@ setup(
         'dev': [
             "coverage==4.4.1",
             "flake8==3.4.1",
-            "pylint==1.7.2",
+            "pylint==2.2.2",
             "pytest==3.2.0",
         ]
     },
