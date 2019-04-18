@@ -7,11 +7,6 @@ python:
   - '3.4'
   - '3.5'
   - '3.6'
-  - nightly
-
-matrix:
-  allow_failures:
-    - python: nightly
 
 install:
   - pip install -U pip setuptools
