@@ -32,7 +32,8 @@ class ElasticsearchDocumentFormatter(JSONFormatter):
         constants.CONTEXT_DATA_KEY,
         constants.REQUEST_KEY,
         constants.RESPONSE_KEY,
-        constants.EXCEPTION_ARGS_KEY)
+        constants.EXCEPTION_ARGS_KEY,
+    )
 
     def format(self, record):
 

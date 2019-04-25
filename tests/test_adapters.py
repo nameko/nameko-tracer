@@ -1,18 +1,18 @@
-from datetime import datetime
 import json
 import logging
 import logging.handlers
+from datetime import datetime
 
+import pytest
 from kombu import Exchange, Queue
 from mock import patch
 from nameko.containers import WorkerContext
 from nameko.events import EventHandler, event_handler
 from nameko.messaging import Consumer, consume
-from nameko.rpc import rpc, Rpc
-from nameko.web.handlers import http, HttpRequestHandler
-from nameko.testing.services import dummy, Entrypoint
+from nameko.rpc import Rpc, rpc
+from nameko.testing.services import Entrypoint, dummy
 from nameko.testing.utils import get_extension
-import pytest
+from nameko.web.handlers import HttpRequestHandler, http
 from werkzeug.test import create_environ
 from werkzeug.wrappers import Request, Response
 
@@ -21,9 +21,7 @@ from nameko_tracer import adapters, constants
 
 @pytest.fixture
 def tracker():
-
     class Tracker(logging.Handler):
-
         def __init__(self, *args, **kwargs):
             self.log_records = []
             super(Tracker, self).__init__(*args, **kwargs)
@@ -45,14 +43,12 @@ def logger(tracker):
 
 
 class TestDefaultAdapter:
-
     @pytest.fixture
     def container(self, container_factory, rabbit_config, service_class):
         return container_factory(service_class, rabbit_config)
 
     @pytest.fixture
     def service_class(self):
-
         class Service(object):
 
             name = "some-service"
@@ -65,205 +61,187 @@ class TestDefaultAdapter:
 
     @pytest.fixture
     def worker_ctx(self, container, service_class):
-        entrypoint = get_extension(
-            container, Entrypoint, method_name='some_method')
-        return WorkerContext(
-            container, service_class, entrypoint, args=('some-arg',))
+        entrypoint = get_extension(container, Entrypoint, method_name="some_method")
+        return WorkerContext(container, service_class, entrypoint, args=("some-arg",))
 
     @pytest.fixture
     def adapter(self, logger):
-        adapter = adapters.DefaultAdapter(
-            logger, extra={'hostname': 'some.host'})
+        adapter = adapters.DefaultAdapter(logger, extra={"hostname": "some.host"})
         return adapter
 
     @pytest.mark.parametrize(
-        'stage',
-        (constants.Stage.request, constants.Stage.response),
+        "stage", (constants.Stage.request, constants.Stage.response)
     )
-    def test_common_worker_data(
-        self, adapter, tracker, worker_ctx, stage
-    ):
+    def test_common_worker_data(self, adapter, tracker, worker_ctx, stage):
 
         extra = {
-            'stage': stage,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': None,
-            'timestamp': datetime(2017, 7, 7, 12, 0, 0),
-            'response_time': 60.0,
+            "stage": stage,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": None,
+            "timestamp": datetime(2017, 7, 7, 12, 0, 0),
+            "response_time": 60.0,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['hostname'] == 'some.host'
-        assert data['service'] == 'some-service'
-        assert data['entrypoint_type'] == 'Entrypoint'
-        assert data['entrypoint_name'] == 'some_method'
-        assert data['call_id'] == worker_ctx.call_id
-        assert data['call_id_stack'] == worker_ctx.call_id_stack
-        assert data['stage'] == stage.value
+        assert data["hostname"] == "some.host"
+        assert data["service"] == "some-service"
+        assert data["entrypoint_type"] == "Entrypoint"
+        assert data["entrypoint_name"] == "some_method"
+        assert data["call_id"] == worker_ctx.call_id
+        assert data["call_id_stack"] == worker_ctx.call_id_stack
+        assert data["stage"] == stage.value
 
     @pytest.mark.parametrize(
-        'stage',
-        (constants.Stage.request, constants.Stage.response),
+        "stage", (constants.Stage.request, constants.Stage.response)
     )
-    def test_worker_ctx_data(
-        self, adapter, tracker, worker_ctx, stage
-    ):
+    def test_worker_ctx_data(self, adapter, tracker, worker_ctx, stage):
 
         worker_ctx.data = {
-            'some-key': 'simple-data',
-            'some-other-key': {'a bit more': ['complex data', 1, None]},
+            "some-key": "simple-data",
+            "some-other-key": {"a bit more": ["complex data", 1, None]},
         }
 
         extra = {
-            'stage': stage,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": stage,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['context_data']['some-key'] == 'simple-data'
-        assert (
-            data['context_data']['some-other-key'] ==
-            {'a bit more': ['complex data', 1, None]})
+        assert data["context_data"]["some-key"] == "simple-data"
+        assert data["context_data"]["some-other-key"] == {
+            "a bit more": ["complex data", 1, None]
+        }
 
     @pytest.mark.parametrize(
-        'stage',
-        (constants.Stage.request, constants.Stage.response),
+        "stage", (constants.Stage.request, constants.Stage.response)
     )
-    def test_call_args_data(
-        self, adapter, tracker, worker_ctx, stage
-    ):
+    def test_call_args_data(self, adapter, tracker, worker_ctx, stage):
 
         extra = {
-            'stage': stage,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": stage,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['call_args'] == {'spam': 'some-arg'}
-        assert data['call_args_redacted'] is False
+        assert data["call_args"] == {"spam": "some-arg"}
+        assert data["call_args_redacted"] is False
 
-    @pytest.fixture(params=['sensitive_variables', 'sensitive_arguments'])
+    @pytest.fixture(params=["sensitive_variables", "sensitive_arguments"])
     def compatibility_shim(self, request):
         return request.param
 
     @pytest.mark.parametrize(
-        'stage',
-        (constants.Stage.request, constants.Stage.response),
+        "stage", (constants.Stage.request, constants.Stage.response)
     )
     def test_sensitive_call_args_data(
         self, adapter, tracker, worker_ctx, stage, compatibility_shim
     ):
-        setattr(worker_ctx.entrypoint, compatibility_shim, ('spam'))
+        setattr(worker_ctx.entrypoint, compatibility_shim, ("spam"))
 
         extra = {
-            'stage': stage,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": stage,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['call_args'] == {'spam': '********'}
-        assert data['call_args_redacted'] is True
+        assert data["call_args"] == {"spam": "********"}
+        assert data["call_args_redacted"] is True
 
     @pytest.mark.parametrize(
-        ('result_in', 'expected_result_out'),
-        (
-            (None, None),
-            ('spam', 'spam'),
-            ({'spam': 'ham'}, {'spam': 'ham'}),
-        ),
+        ("result_in", "expected_result_out"),
+        ((None, None), ("spam", "spam"), ({"spam": "ham"}, {"spam": "ham"})),
     )
     def test_result_data(
         self, adapter, tracker, worker_ctx, result_in, expected_result_out
     ):
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': result_in,
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": result_in,
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['response'] == expected_result_out
-        assert data['response_status'] == constants.Status.success.value
+        assert data["response"] == expected_result_out
+        assert data["response_status"] == constants.Status.success.value
 
     def test_exception_data(self, adapter, tracker, worker_ctx):
-
         class Error(Exception):
             pass
 
-        exception = Error('Yo!')
+        exception = Error("Yo!")
         exc_info = (Error, exception, exception.__traceback__)
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': exc_info,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": exc_info,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert 'response' not in data
+        assert "response" not in data
 
-        assert data['exception_type'] == 'Error'
-        assert data['exception_path'] == 'test_adapters.Error'
-        assert data['exception_args'] == ["Yo!"]
-        assert data['exception_value'] == 'Yo!'
+        assert data["exception_type"] == "Error"
+        assert data["exception_path"] == "test_adapters.Error"
+        assert data["exception_args"] == ["Yo!"]
+        assert data["exception_value"] == "Yo!"
 
-        assert 'Error: Yo!' in data['exception_traceback']
+        assert "Error: Yo!" in data["exception_traceback"]
 
-        assert data['exception_expected'] is False
+        assert data["exception_expected"] is False
 
-        assert data['response_status'] == constants.Status.error.value
+        assert data["response_status"] == constants.Status.error.value
 
-    @pytest.mark.parametrize('expected_exceptions', (None, (), (ValueError)))
+    @pytest.mark.parametrize("expected_exceptions", (None, (), (ValueError)))
     def test_exception_data_unexpected_exception(
         self, adapter, tracker, worker_ctx, expected_exceptions
     ):
@@ -273,56 +251,53 @@ class TestDefaultAdapter:
         class Error(Exception):
             pass
 
-        exception = Error('Yo!')
+        exception = Error("Yo!")
         exc_info = (Error, exception, exception.__traceback__)
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': exc_info,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": exc_info,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['exception_expected'] is False
+        assert data["exception_expected"] is False
 
-    def test_exception_data_expected_exception(
-        self, adapter, tracker, worker_ctx
-    ):
-
+    def test_exception_data_expected_exception(self, adapter, tracker, worker_ctx):
         class Error(Exception):
             pass
 
-        worker_ctx.entrypoint.expected_exceptions = (Error)
+        worker_ctx.entrypoint.expected_exceptions = Error
 
-        exception = Error('Yo!')
+        exception = Error("Yo!")
         exc_info = (Error, exception, exception.__traceback__)
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': exc_info,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": exc_info,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['exception_expected'] is True
+        assert data["exception_expected"] is True
 
-    @patch('nameko_tracer.adapters.format_exception')
+    @patch("nameko_tracer.adapters.format_exception")
     def test_exception_data_deals_with_failing_exception_serialisation(
         self, format_exception, adapter, tracker, worker_ctx
     ):
@@ -332,39 +307,37 @@ class TestDefaultAdapter:
         class Error(Exception):
             pass
 
-        exception = Error('Yo!')
+        exception = Error("Yo!")
         exc_info = (Error, exception, exception.__traceback__)
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': None,
-            'exc_info_': exc_info,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": None,
+            "exc_info_": exc_info,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert 'response' not in data
+        assert "response" not in data
 
-        assert data['exception_type'] == 'Error'
-        assert data['exception_path'] == 'test_adapters.Error'
-        assert data['exception_args'] == ["Yo!"]
-        assert data['exception_type'] == 'Error'
-        assert data['exception_value'] == 'Yo!'
+        assert data["exception_type"] == "Error"
+        assert data["exception_path"] == "test_adapters.Error"
+        assert data["exception_args"] == ["Yo!"]
+        assert data["exception_type"] == "Error"
+        assert data["exception_value"] == "Yo!"
 
-        assert (
-            data['exception_traceback'] ==
-            'traceback serialisation failed')
+        assert data["exception_traceback"] == "traceback serialisation failed"
 
-        assert data['exception_expected'] is False
+        assert data["exception_expected"] is False
 
-        assert data['response_status'] == constants.Status.error.value
+        assert data["response_status"] == constants.Status.error.value
 
     @pytest.fixture(params=[Rpc, EventHandler, Consumer])
     def entrypoint(self, request, container_factory, rabbit_config):
@@ -385,8 +358,7 @@ class TestDefaultAdapter:
             def event_handler(self, payload):
                 pass
 
-            @consume(queue=Queue(
-                'service', exchange=exchange, routing_key=ROUTING_KEY))
+            @consume(queue=Queue("service", exchange=exchange, routing_key=ROUTING_KEY))
             def consume(self, payload):
                 pass
 
@@ -394,13 +366,12 @@ class TestDefaultAdapter:
 
         extension_class = request.param
 
-        methods = {
-            Rpc: 'rpc', EventHandler: 'event_handler', Consumer: 'consume'}
+        methods = {Rpc: "rpc", EventHandler: "event_handler", Consumer: "consume"}
 
         entrypoint = get_extension(
-            container, extension_class, method_name=methods[extension_class])
-        worker_context = WorkerContext(
-            container, Service, entrypoint, args=('spam',))
+            container, extension_class, method_name=methods[extension_class]
+        )
+        worker_context = WorkerContext(container, Service, entrypoint, args=("spam",))
 
         return entrypoint, worker_context
 
@@ -409,42 +380,40 @@ class TestDefaultAdapter:
         entrypoint, worker_ctx = entrypoint
 
         extra = {
-            'stage': constants.Stage.response,
-            'worker_ctx': worker_ctx,
-            'result': {'some': 'data'},
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": constants.Stage.response,
+            "worker_ctx": worker_ctx,
+            "result": {"some": "data"},
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        assert data['response'] == {'some': 'data'}
-        assert data['response_status'] == constants.Status.success.value
-        assert data['entrypoint_type'] == entrypoint.__class__.__name__
-        assert data['entrypoint_name'] == entrypoint.method_name
+        assert data["response"] == {"some": "data"}
+        assert data["response_status"] == constants.Status.success.value
+        assert data["entrypoint_type"] == entrypoint.__class__.__name__
+        assert data["entrypoint_name"] == entrypoint.method_name
 
 
 class TestHttpRequestHandlerAdapter:
-
     @pytest.fixture
     def container(self, container_factory, rabbit_config, service_class):
         return container_factory(service_class, rabbit_config)
 
     @pytest.fixture
     def service_class(self):
-
         class Service(object):
 
             name = "some-service"
 
-            @http('GET', '/spam/<int:value>')
+            @http("GET", "/spam/<int:value>")
             def some_method(self, request, value):
-                payload = {'value': value}
+                payload = {"value": value}
                 return json.dumps(payload)
 
         return Service
@@ -453,148 +422,129 @@ class TestHttpRequestHandlerAdapter:
     def worker_ctx(self, container, service_class):
 
         environ = create_environ(
-            '/spam/1?test=123',
-            'http://localhost:8080/',
-            data=json.dumps({'foo': 'bar'}),
-            content_type='application/json'
+            "/spam/1?test=123",
+            "http://localhost:8080/",
+            data=json.dumps({"foo": "bar"}),
+            content_type="application/json",
         )
         request = Request(environ)
 
         entrypoint = get_extension(
-            container, HttpRequestHandler, method_name='some_method')
-        return WorkerContext(
-            container, service_class, entrypoint, args=(request, 1))
+            container, HttpRequestHandler, method_name="some_method"
+        )
+        return WorkerContext(container, service_class, entrypoint, args=(request, 1))
 
     @pytest.fixture
     def adapter(self, logger):
         adapter = adapters.HttpRequestHandlerAdapter(
-            logger, extra={'hostname': 'some.host'})
+            logger, extra={"hostname": "some.host"}
+        )
         return adapter
 
     @pytest.mark.parametrize(
-        'stage',
-        (constants.Stage.request, constants.Stage.response),
+        "stage", (constants.Stage.request, constants.Stage.response)
     )
-    def test_call_args_data(
-        self, adapter, tracker, worker_ctx, stage
-    ):
+    def test_call_args_data(self, adapter, tracker, worker_ctx, stage):
 
         extra = {
-            'stage': stage,
-            'worker_ctx': worker_ctx,
-            'result': Response(
-                json.dumps({"value": 1}), mimetype='application/json'),
-            'exc_info_': None,
-            'timestamp': None,
-            'response_time': None,
+            "stage": stage,
+            "worker_ctx": worker_ctx,
+            "result": Response(json.dumps({"value": 1}), mimetype="application/json"),
+            "exc_info_": None,
+            "timestamp": None,
+            "response_time": None,
         }
 
-        adapter.info('spam', extra=extra)
+        adapter.info("spam", extra=extra)
 
         log_record = tracker.log_records[-1]
 
         data = getattr(log_record, constants.TRACE_KEY)
 
-        call_args = data['call_args']
+        call_args = data["call_args"]
 
-        assert call_args['value'] == 1
+        assert call_args["value"] == 1
 
-        request = call_args['request']
+        request = call_args["request"]
 
-        assert request['method'] == 'GET'
-        assert request['url'] == 'http://localhost:8080/spam/1?test=123'
-        assert request['env']['server_port'] == '8080'
-        assert request['env']['server_name'] == 'localhost'
-        assert request['headers']['host'] == 'localhost:8080'
-        assert request['headers']['content_type'] == 'application/json'
-        assert request['headers']['content_length'] == '14'
-        assert request['data'] == '{"foo": "bar"}'
+        assert request["method"] == "GET"
+        assert request["url"] == "http://localhost:8080/spam/1?test=123"
+        assert request["env"]["server_port"] == "8080"
+        assert request["env"]["server_name"] == "localhost"
+        assert request["headers"]["host"] == "localhost:8080"
+        assert request["headers"]["content_type"] == "application/json"
+        assert request["headers"]["content_length"] == "14"
+        assert request["data"] == '{"foo": "bar"}'
 
     @pytest.mark.parametrize(
-        ('data_in', 'content_type', 'expected_data_out'),
+        ("data_in", "content_type", "expected_data_out"),
         (
-            (
-                json.dumps({'foo': 'bar'}),
-                'application/json',
-                '{"foo": "bar"}',
-            ),
-            (
-                'foo=bar',
-                'application/x-www-form-urlencoded',
-                {'foo': 'bar'},
-            ),
-            (
-                'foo=bar',
-                'text/plain',
-                'foo=bar',
-            ),
-        )
+            (json.dumps({"foo": "bar"}), "application/json", '{"foo": "bar"}'),
+            ("foo=bar", "application/x-www-form-urlencoded", {"foo": "bar"}),
+            ("foo=bar", "text/plain", "foo=bar"),
+        ),
     )
     def test_can_get_request_data(
-        self, adapter, container, service_class, data_in, content_type,
-        expected_data_out
+        self,
+        adapter,
+        container,
+        service_class,
+        data_in,
+        content_type,
+        expected_data_out,
     ):
 
         environ = create_environ(
-            '/get/1?test=123',
-            'http://localhost:8080/',
+            "/get/1?test=123",
+            "http://localhost:8080/",
             data=data_in,
-            content_type=content_type
+            content_type=content_type,
         )
         request = Request(environ)
 
         entrypoint = get_extension(
-            container, HttpRequestHandler, method_name='some_method')
+            container, HttpRequestHandler, method_name="some_method"
+        )
         worker_ctx = WorkerContext(
-            container, service_class, entrypoint, args=(request, 1))
+            container, service_class, entrypoint, args=(request, 1)
+        )
 
         call_args, redacted = adapter.get_call_args(worker_ctx)
 
         assert redacted is False
 
-        assert call_args['request']['data'] == expected_data_out
-        assert call_args['request']['headers']['content_type'] == content_type
+        assert call_args["request"]["data"] == expected_data_out
+        assert call_args["request"]["headers"]["content_type"] == content_type
 
     @pytest.mark.parametrize(
-        ('response', 'data', 'status_code', 'content_type'),
+        ("response", "data", "status_code", "content_type"),
         (
-            (Response(
+            (
+                Response('{"value": 1}', status=200, mimetype="application/json"),
                 '{"value": 1}',
-                status=200,
-                mimetype='application/json',
-            ), '{"value": 1}', 200, 'application/json',
-            ),
-            (Response(
-                'foo',
-                status=202,
-                mimetype='text/plain',
-            ), 'foo', 202, 'text/plain',
-            ),
-            (Response(
-                'some error',
-                status=400,
-                mimetype='text/plain',
-            ), 'some error', 400, 'text/plain',
+                200,
+                "application/json",
             ),
             (
-                (200, {}, 'foo'),
-                'foo', 200, 'text/plain',
+                Response("foo", status=202, mimetype="text/plain"),
+                "foo",
+                202,
+                "text/plain",
             ),
             (
-                (200, 'foo'),
-                'foo', 200, 'text/plain',
+                Response("some error", status=400, mimetype="text/plain"),
+                "some error",
+                400,
+                "text/plain",
             ),
-            (
-                'foo',
-                'foo', 200, 'text/plain',
-            )
-        )
+            ((200, {}, "foo"), "foo", 200, "text/plain"),
+            ((200, "foo"), "foo", 200, "text/plain"),
+            ("foo", "foo", 200, "text/plain"),
+        ),
     )
-    def test_result_data(
-        self, adapter, response, data, status_code, content_type
-    ):
+    def test_result_data(self, adapter, response, data, status_code, content_type):
 
         result = adapter.get_result(response)
-        assert result['data'] == data.encode('utf-8')
-        assert result['status_code'] == status_code
-        assert result['content_type'].startswith(content_type)
+        assert result["data"] == data.encode("utf-8")
+        assert result["status_code"] == status_code
+        assert result["content_type"].startswith(content_type)
