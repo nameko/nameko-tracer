@@ -8,23 +8,43 @@ services:
 before_install:
   - docker run -d --rm -p 15672:15672 -p 5672:5672 -p 5671:5671 --name nameko-rabbitmq nameko/nameko-rabbitmq:3.6.6
 
-python:
-  - '3.5'
-  - '3.6'
-  - '3.7'
+stages:
+  - test
 
-env:
-  - NAMEKO_VERSION===2.8.5
-  - NAMEKO_VERSION===2.9.1
-  - NAMEKO_VERSION===2.10.0
-  - NAMEKO_VERSION===2.11.0
-  - NAMEKO_VERSION=>=2.12.0
-  - NAMEKO_VERSION===3.0.0-rc6
+jobs:
+  include:
+  - python: 3.6
+    env: DEPS="--pre nameko"
+  - python: 3.6
+    env: DEPS="nameko>=2.12.0"
+  - python: 3.6
+    env: DEPS="nameko==2.11.0"
+  - python: 3.6
+    env: DEPS="nameko==2.10.0"
+  - python: 3.6
+    env: DEPS="nameko==2.9.1"
+  - python: 3.6
+    env: DEPS="nameko==2.8.5"
+  - python: 3.6
+    env: DEPS="nameko==2.8.1 pytest<3.3.0"
+  - python: 3.6
+    env: DEPS="nameko==2.8.0 pytest<3.3.0"
+  - python: 3.6
+    env: DEPS="nameko==2.7.0 pytest<3.3.0"
+  - python: 3.7
+    env: DEPS="nameko>=2.12.0"
+  - python: 3.5
+    env: DEPS="nameko>=2.12.0"
+
+matrix:
+  allow_failures:
+    - python: 3.6
+      env: DEPS="--pre nameko"
 
 install:
   - pip install -U pip setuptools
   - pip install -U -e ".[dev]"
-  - pip install -U nameko$NAMEKO_VERSION
+  - pip install -U $DEPS
 
 script:
   - make test
