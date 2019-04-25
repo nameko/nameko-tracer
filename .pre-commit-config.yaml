@@ -1,0 +1,20 @@
+repos:
+- repo: git://github.com/pre-commit/pre-commit-hooks
+  rev: v1.3.0
+  hooks:
+  - id: trailing-whitespace
+  - id: check-ast
+  - id: check-merge-conflict
+  - id: flake8
+- repo: https://github.com/asottile/seed-isort-config
+  rev: v1.8.0
+  hooks:
+  - id: seed-isort-config
+- repo: https://github.com/pre-commit/mirrors-isort
+  rev: v4.3.17
+  hooks:
+  - id: isort
+- repo: https://github.com/ambv/black
+  rev: 19.3b0
+  hooks:
+  - id: black
