@@ -10,14 +10,14 @@ setup(
     url='https://github.com/nameko/nameko-tracer',
     packages=find_packages(exclude=['test', 'test.*']),
     install_requires=[
-        "nameko>=2.2.0",
+        "nameko>=2.8.5",
     ],
     extras_require={
         'dev': [
-            "coverage==4.4.1",
-            "flake8==3.4.1",
-            "pylint==2.2.2",
-            "pytest==3.2.0",
+            "coverage",
+            "flake8",
+            "pylint",
+            "pytest",
         ]
     },
     dependency_links=[],
