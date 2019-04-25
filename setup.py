@@ -10,7 +10,7 @@ setup(
     url='https://github.com/nameko/nameko-tracer',
     packages=find_packages(exclude=['test', 'test.*']),
     install_requires=[
-        "nameko>=2.2.0",
+        "nameko>=2.8.5",
     ],
     extras_require={
         'dev': [
