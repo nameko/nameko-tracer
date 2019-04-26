@@ -47,7 +47,7 @@ install:
   - pip install -U $DEPS
 
 script:
-  - make test
+  - make pytest
 
 deploy:
   - provider: pypi
