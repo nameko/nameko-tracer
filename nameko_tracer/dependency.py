@@ -1,7 +1,7 @@
-from collections import defaultdict
-from datetime import datetime
 import logging
 import socket
+from collections import defaultdict
+from datetime import datetime
 from weakref import WeakKeyDictionary
 
 from nameko.extensions import DependencyProvider
@@ -28,8 +28,7 @@ class Tracer(DependencyProvider):
         config = self.container.config.get(constants.CONFIG_KEY, {})
 
         self.configure_adapter_types(constants.DEFAULT_ADAPTERS)
-        self.configure_adapter_types(
-            config.get(constants.ADAPTERS_CONFIG_KEY, {}))
+        self.configure_adapter_types(config.get(constants.ADAPTERS_CONFIG_KEY, {}))
 
         self.logger = logging.getLogger(constants.LOGGER_NAME)
 
@@ -41,7 +40,7 @@ class Tracer(DependencyProvider):
 
     def adapter_factory(self, worker_ctx):
         adapter_class = self.adapter_types[type(worker_ctx.entrypoint)]
-        extra = {'hostname': socket.gethostname()}
+        extra = {"hostname": socket.gethostname()}
         return adapter_class(self.logger, extra=extra)
 
     def worker_setup(self, worker_ctx):
@@ -53,17 +52,14 @@ class Tracer(DependencyProvider):
 
         try:
             extra = {
-                'stage': constants.Stage.request,
-                'worker_ctx': worker_ctx,
-                'timestamp': timestamp,
+                "stage": constants.Stage.request,
+                "worker_ctx": worker_ctx,
+                "timestamp": timestamp,
             }
             adapter = self.adapter_factory(worker_ctx)
-            adapter.info(
-                '[%s] entrypoint call trace',
-                worker_ctx.call_id,
-                extra=extra)
+            adapter.info("[%s] entrypoint call trace", worker_ctx.call_id, extra=extra)
         except Exception:
-            logger.warning('Failed to log entrypoint trace', exc_info=True)
+            logger.warning("Failed to log entrypoint trace", exc_info=True)
 
     def worker_result(self, worker_ctx, result=None, exc_info=None):
         """ Log entrypoint result details
@@ -75,23 +71,21 @@ class Tracer(DependencyProvider):
 
         try:
             extra = {
-                'stage': constants.Stage.response,
-                'worker_ctx': worker_ctx,
-                'result': result,
-                'exc_info_': exc_info,
-                'timestamp': timestamp,
-                'response_time': response_time,
+                "stage": constants.Stage.response,
+                "worker_ctx": worker_ctx,
+                "result": result,
+                "exc_info_": exc_info,
+                "timestamp": timestamp,
+                "response_time": response_time,
             }
             adapter = self.adapter_factory(worker_ctx)
             if exc_info:
                 adapter.warning(
-                    '[%s] entrypoint result trace',
-                    worker_ctx.call_id,
-                    extra=extra)
+                    "[%s] entrypoint result trace", worker_ctx.call_id, extra=extra
+                )
             else:
                 adapter.info(
-                    '[%s] entrypoint result trace',
-                    worker_ctx.call_id,
-                    extra=extra)
+                    "[%s] entrypoint result trace", worker_ctx.call_id, extra=extra
+                )
         except Exception:
-            logger.warning('Failed to log entrypoint trace', exc_info=True)
+            logger.warning("Failed to log entrypoint trace", exc_info=True)

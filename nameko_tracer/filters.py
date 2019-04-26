@@ -2,7 +2,6 @@ import abc
 import logging
 import re
 
-
 from nameko_tracer import constants, utils
 
 
@@ -54,7 +53,7 @@ class TruncateCallArgsFilter(BaseTruncateFilter):
         call_args = utils.serialise_to_string(data[constants.REQUEST_KEY])
         length = len(call_args)
         if length > self.max_len:
-            data[constants.REQUEST_KEY] = call_args[:self.max_len]
+            data[constants.REQUEST_KEY] = call_args[: self.max_len]
             truncated = True
         else:
             truncated = False
@@ -77,7 +76,7 @@ class TruncateResponseFilter(BaseTruncateFilter):
 
     """
 
-    default_entrypoints = ['^get_|^list_|^query_']
+    default_entrypoints = ["^get_|^list_|^query_"]
 
     def truncate(self, data):
 
@@ -87,7 +86,7 @@ class TruncateResponseFilter(BaseTruncateFilter):
         result = utils.serialise_to_string(data[constants.RESPONSE_KEY])
         length = len(result)
         if length > self.max_len:
-            data[constants.RESPONSE_KEY] = result[:self.max_len]
+            data[constants.RESPONSE_KEY] = result[: self.max_len]
             truncated = True
         else:
             truncated = False

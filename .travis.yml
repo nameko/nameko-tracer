@@ -9,6 +9,7 @@ before_install:
   - docker run -d --rm -p 15672:15672 -p 5672:5672 -p 5671:5671 --name nameko-rabbitmq nameko/nameko-rabbitmq:3.6.6
 
 stages:
+  - static
   - test
 
 jobs:
@@ -29,6 +30,11 @@ jobs:
     env: DEPS="nameko>=2.12.0"
   - python: 3.5
     env: DEPS="nameko>=2.12.0"
+  - python: 3.6
+    stage: static
+    install: pip install pre-commit
+    script: make static
+    env:
 
 matrix:
   allow_failures:
@@ -41,7 +47,7 @@ install:
   - pip install -U $DEPS
 
 script:
-  - make test
+  - make pytest
 
 deploy:
   - provider: pypi
