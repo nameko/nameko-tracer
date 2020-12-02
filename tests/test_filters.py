@@ -67,7 +67,9 @@ def test_truncate_call_args(
     stage,
 ):
 
-    filter_ = filters.TruncateCallArgsFilter(entrypoints=entrypoints, max_len=max_len)
+    filter_ = filters.TruncateCallArgsFilter(
+        entrypoints=entrypoints, max_len=max_len
+    )
 
     logger.addFilter(filter_)
 
@@ -183,7 +185,9 @@ def test_truncate_response(
     truncated,
 ):
 
-    filter_ = filters.TruncateResponseFilter(entrypoints=entrypoints, max_len=max_len)
+    filter_ = filters.TruncateResponseFilter(
+        entrypoints=entrypoints, max_len=max_len
+    )
 
     logger.addFilter(filter_)
 
