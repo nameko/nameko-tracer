@@ -5,8 +5,6 @@
 Nameko Entrypoint Tracer
 ========================
 
-TODO introduction ...
-
 Usage
 =====
 
