@@ -97,3 +97,15 @@ class TruncateResponseFilter(BaseTruncateFilter):
 
 
 TruncateRequestFilter = TruncateCallArgsFilter
+
+
+class HealthCheckTraceFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            return record.worker_ctx.entrypoint.url not in [
+                "/health-check",
+                "/health_check",
+                "/healthcheck",
+            ]
+        except AttributeError:
+            return True
