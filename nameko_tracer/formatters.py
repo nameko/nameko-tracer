@@ -1,5 +1,6 @@
 import json
 import logging
+from functools import partial
 
 from nameko_tracer import constants
 
@@ -8,16 +9,20 @@ def default(obj):
     return str(obj)
 
 
-def serialise(obj):
-    return json.dumps(obj, default=default)
+serialise = partial(json.dumps, default=default)
 
 
 class JSONFormatter(logging.Formatter):
     """ Format trace data as JSON string
     """
+    def __init__(self, **option):
+        self.option = option
 
     def format(self, record):
-        return serialise(getattr(record, constants.TRACE_KEY))
+        return serialise(getattr(record, constants.TRACE_KEY), **self.option)
+
+
+PrettyJSONFormatter = partial(JSONFormatter, indent=4, sort_keys=True)
 
 
 class ElasticsearchDocumentFormatter(JSONFormatter):
