@@ -2,6 +2,15 @@ Release Notes
 =============
 
 
+Version 1.3.0
+-------------
+
+Release 2020-12-02
+
+* Add PrettyJSONFormatter useful for development of Nameko services
+* Add HealthCheckTraceFilter useful for filtering out healthcheck entrypoint traces
+
+
 Version 1.2.0
 -------------
 
