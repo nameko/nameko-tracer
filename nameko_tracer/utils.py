@@ -1,7 +1,7 @@
-import collections
 from importlib import import_module
 import json
 import logging
+import sys
 
 import six
 
@@ -23,6 +23,10 @@ def serialise_to_string(value):
 
 def safe_for_serialisation(value):
     no_op_types = six.string_types + six.integer_types + (float, type(None))
+    if sys.version_info >= (3, 3):  # pragma: no cover
+        from collections.abc import Iterable  # pylint: disable=E0611,E0401
+    else:  # pragma: no cover
+        from collections import Iterable  # pylint: disable=E0611,E0401
     if isinstance(value, no_op_types):
         return value
     if isinstance(value, bytes):
@@ -31,7 +35,7 @@ def safe_for_serialisation(value):
         return {
             safe_for_serialisation(key): safe_for_serialisation(val)
             for key, val in six.iteritems(value)}
-    if isinstance(value, collections.Iterable):
+    if isinstance(value, Iterable):
         return list(map(safe_for_serialisation, value))
     try:
         return six.text_type(value)
