@@ -13,6 +13,8 @@ stages:
 
 jobs:
   include:
+  - python: 3.10.0
+    env: DEPS="nameko==3.0.0-rc11"
   - python: 3.6
     env: DEPS="--pre nameko"
   - python: 3.6
