@@ -6,6 +6,8 @@ flake8:
 pylint:
 	pylint nameko_tracer -E
 
+static: flake8 pylint
+
 pytest:
-	coverage run --concurrency=eventlet --source nameko_tracer --branch -m pytest tests
+	coverage run --concurrency=eventlet --source nameko_tracer --branch -m nameko test
 	coverage report --show-missing --fail-under=100
