@@ -1,4 +1,3 @@
-import collections
 from importlib import import_module
 import json
 import logging
